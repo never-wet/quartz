@@ -821,6 +821,22 @@
                                 </StackPanel>
                             </Border>
 
+                            <Border Margin="0,12,0,0" Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="Quartz updates" />
+                                    <TextBlock x:Name="CurrentVersionText" Margin="0,5,0,0" FontSize="11" Foreground="{DynamicResource QuartzMutedTextBrush}" />
+                                    <TextBlock x:Name="LatestVersionText" Margin="0,3,0,0" FontSize="11" Foreground="{DynamicResource QuartzMutedTextBrush}" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="UpdateStatusText" Margin="0,6,0,10" FontSize="11" Foreground="{DynamicResource QuartzMutedTextBrush}" TextWrapping="Wrap" />
+                                    <CheckBox x:Name="AutoCheckUpdatesCheckBox" Margin="0,0,0,9" Content="Check for updates when Quartz starts" Checked="AutoCheckUpdatesCheckBox_Changed" Unchecked="AutoCheckUpdatesCheckBox_Changed" />
+                                    <ProgressBar x:Name="UpdateProgressBar" Height="5" Margin="0,0,0,8" Minimum="0" Maximum="100" Visibility="Collapsed" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="CheckForUpdatesButton" Height="32" Margin="0,0,8,0" Padding="10,0" Content="Check for updates" Click="CheckForUpdatesButton_Click" />
+                                        <Button x:Name="DownloadUpdateButton" Height="32" Margin="0,0,8,0" Padding="10,0" Content="Download update" Visibility="Collapsed" Click="DownloadUpdateButton_Click" />
+                                        <Button x:Name="RestartToUpdateButton" Height="32" Padding="10,0" Style="{StaticResource AccentButtonStyle}" Content="Restart to update" Visibility="Collapsed" Click="RestartToUpdateButton_Click" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
                             <Border Margin="0,12,0,0"
                                     Style="{StaticResource PanelCardStyle}">
                                 <StackPanel>

@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private readonly DownloadService _downloadService;
     private readonly HistoryService _historyService;
     private readonly SettingsService _settingsService;
+    private readonly UpdateService _updateService;
     private readonly ExtensionService _extensionService;
     private readonly IRequestContext _requestContext;
     private readonly bool _ownsRequestContext;
@@ -62,6 +63,7 @@ public partial class MainWindow : Window
             ? HistoryService.CreatePrivate(_privateDataDirectory!)
             : HistoryService.CreateDefault();
         _settingsService = SettingsService.CreateDefault();
+        _updateService = UpdateService.CreateDefault();
         _extensionService = ExtensionService.CreateDefault();
         ThemeManager.AppearanceChanged += ThemeManager_AppearanceChanged;
         BookmarksItems.ItemsSource = _bookmarkService.Bookmarks;
@@ -70,6 +72,7 @@ public partial class MainWindow : Window
         ExtensionsItems.ItemsSource = _extensionService.Extensions;
         _downloadService.PersistenceFailed += DownloadService_PersistenceFailed;
         PopulateSettingsControls();
+        RefreshUpdateControls();
         ApplySidebarVisibility(_settingsService.Current.SidebarVisible);
         UpdateBookmarkButton();
         if (_isPrivate)
@@ -93,6 +96,10 @@ public partial class MainWindow : Window
             ? BrowserSettings.NewTabPage
             : _settingsService.Current.HomepageUrl;
         await CreateTabAsync(startupAddress);
+        if (!_isPrivate && _settingsService.Current.AutoCheckForUpdates)
+        {
+            _ = CheckForUpdatesAsync(quiet: true);
+        }
     }
 
     private void Window_StateChanged(object? sender, EventArgs e)
@@ -992,7 +999,87 @@ public partial class MainWindow : Window
         SelectComboBoxItem(ThemeComboBox, _settingsService.Current.Theme.ToString());
         SelectComboBoxItem(AccentComboBox, _settingsService.Current.Accent.ToString());
         SidebarVisibleCheckBox.IsChecked = _settingsService.Current.SidebarVisible;
+        AutoCheckUpdatesCheckBox.IsChecked = _settingsService.Current.AutoCheckForUpdates;
         _isPopulatingSettings = false;
+    }
+
+    private void RefreshUpdateControls()
+    {
+        var state = _updateService.State;
+        CurrentVersionText.Text = $"Current version: {UpdateService.CurrentVersion}";
+        LatestVersionText.Text = state.LatestVersion is null
+            ? "Latest version: not checked"
+            : $"Latest version: {state.LatestVersion}" + (state.LastCheckedAt is null ? string.Empty : $" · checked {state.LastCheckedAt.Value.LocalDateTime:g}");
+        UpdateStatusText.Text = state.Status;
+        CheckForUpdatesButton.IsEnabled = true;
+        DownloadUpdateButton.Visibility = _updateService.HasReadyUpdate ? Visibility.Collapsed :
+            Version.TryParse(state.LatestVersion, out var latest) && latest > UpdateService.CurrentVersion ? Visibility.Visible : Visibility.Collapsed;
+        RestartToUpdateButton.Visibility = _updateService.HasReadyUpdate ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async Task CheckForUpdatesAsync(bool quiet)
+    {
+        CheckForUpdatesButton.IsEnabled = false;
+        UpdateStatusText.Text = "Checking GitHub Releases…";
+        var available = await _updateService.CheckAsync();
+        RefreshUpdateControls();
+        if (available && !quiet)
+        {
+            StatusText.Text = "A Quartz update is available.";
+        }
+    }
+
+    private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesAsync(quiet: false);
+
+    private async void DownloadUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            DownloadUpdateButton.IsEnabled = false;
+            UpdateProgressBar.Visibility = Visibility.Visible;
+            UpdateStatusText.Text = "Downloading update from GitHub…";
+            var progress = new Progress<double>(value => UpdateProgressBar.Value = value);
+            await _updateService.DownloadLatestAsync(progress);
+            StatusText.Text = "Quartz update downloaded. Restart to install it.";
+        }
+        catch (Exception exception) when (exception is HttpRequestException or IOException or InvalidDataException or UnauthorizedAccessException or TaskCanceledException)
+        {
+            _updateService.State.Status = $"Update download failed: {exception.Message}";
+        }
+        finally
+        {
+            UpdateProgressBar.Visibility = Visibility.Collapsed;
+            RefreshUpdateControls();
+        }
+    }
+
+    private void RestartToUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Quartz will close and install the downloaded update. Continue?", "Restart to update", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            _updateService.StartPendingInstaller();
+            Application.Current.Shutdown();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
+        {
+            MessageBox.Show($"Quartz could not start the update installer.\n\n{exception.Message}", "Quartz update", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void AutoCheckUpdatesCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isPopulatingSettings)
+        {
+            return;
+        }
+
+        try { _settingsService.UpdateAutoCheckForUpdates(AutoCheckUpdatesCheckBox.IsChecked == true); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { ShowSettingsSaveError(exception); }
     }
 
     private static void SelectComboBoxItem(ComboBox comboBox, string tag)

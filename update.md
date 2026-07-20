@@ -4,9 +4,15 @@ This file tracks major Quartz browser versions, completed work, and known issues
 
 ## Current Version
 
-Current stable version: **2.0**
+Current stable version: **2.1**
 
-Latest completed update: **2.0**
+Latest completed update: **2.1**
+
+## Version 2.1
+
+- Added a free GitHub Releases update checker and installer downloader.
+- Added optional startup checks, Settings update status, download progress, checksum verification when `SHA256SUMS.txt` is supplied, and restart-to-install handoff.
+- Inno Setup updates use the same AppId and preserve `%LOCALAPPDATA%\Quartz` browser data.
 
 ## Version 2.0
 

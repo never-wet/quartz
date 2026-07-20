@@ -65,7 +65,8 @@ internal sealed class SettingsService
             StartupBehavior = startupBehavior,
             Theme = theme,
             Accent = accent,
-            SidebarVisible = sidebarVisible
+            SidebarVisible = sidebarVisible,
+            AutoCheckForUpdates = Current.AutoCheckForUpdates
         };
 
         Save(updated);
@@ -86,9 +87,26 @@ internal sealed class SettingsService
             StartupBehavior = Current.StartupBehavior,
             Theme = theme,
             Accent = accent,
-            SidebarVisible = sidebarVisible
+            SidebarVisible = sidebarVisible,
+            AutoCheckForUpdates = Current.AutoCheckForUpdates
         };
 
+        Save(updated);
+        Current = updated;
+    }
+
+    public void UpdateAutoCheckForUpdates(bool enabled)
+    {
+        var updated = new BrowserPreferences
+        {
+            HomepageUrl = Current.HomepageUrl,
+            SearchEngine = Current.SearchEngine,
+            StartupBehavior = Current.StartupBehavior,
+            Theme = Current.Theme,
+            Accent = Current.Accent,
+            SidebarVisible = Current.SidebarVisible,
+            AutoCheckForUpdates = enabled
+        };
         Save(updated);
         Current = updated;
     }
@@ -122,7 +140,8 @@ internal sealed class SettingsService
                 StartupBehavior = stored.StartupBehavior,
                 Theme = stored.Theme,
                 Accent = stored.Accent,
-                SidebarVisible = stored.SidebarVisible
+                SidebarVisible = stored.SidebarVisible,
+                AutoCheckForUpdates = stored.AutoCheckForUpdates
             };
         }
         catch (JsonException)

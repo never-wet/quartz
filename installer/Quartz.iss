@@ -1,5 +1,5 @@
 #define MyAppName "Quartz"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "2.1.0"
 #define MyAppPublisher "Quartz contributors"
 #define MyAppExeName "Quartz.exe"
 #define PublishDir "..\artifacts\publish\win-x64"
@@ -10,7 +10,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-VersionInfoVersion=2.0.0.0
+VersionInfoVersion=2.1.0.0
 VersionInfoProductName=Quartz Browser
 VersionInfoProductVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
@@ -23,7 +23,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\release
-OutputBaseFilename=Quartz-2.0.0-Setup
+OutputBaseFilename=Quartz-2.1.0-Setup
 SetupIconFile=..\src\Quartz\Assets\Quartz.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName=Quartz Browser
@@ -39,6 +39,7 @@ WizardBackColor=#0d0b14
 DisableWelcomePage=no
 CloseApplications=yes
 RestartApplications=no
+CloseApplicationsFilter=Quartz.exe
 ChangesAssociations=no
 
 [Languages]

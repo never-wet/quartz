@@ -43,4 +43,6 @@ internal sealed class BrowserPreferences
     public AccentPreset Accent { get; set; } = AccentPreset.Violet;
 
     public bool SidebarVisible { get; set; } = true;
+
+    public bool AutoCheckForUpdates { get; set; } = true;
 }
