@@ -115,14 +115,32 @@
     </section>
 
     <section id="updates" class="updates section-shell">
-      <div class="section-heading compact"><p class="kicker">LATEST UPDATE</p><h2>Quartz 2.0</h2><p>A packaged Chromium/CEF engine and the first experimental extension support.</p></div>
+      <div class="section-heading compact"><p class="kicker">VERSION HISTORY</p><h2>Quartz 2.0</h2><p>A packaged Chromium/CEF engine and the first experimental extension support. Quartz 1.x is kept here as the original public WebView2 release line.</p></div>
       <div class="update-layout">
-        <div class="version-block"><span>VERSION</span><strong>2.0</strong><p>Current release</p></div>
-        <ul class="change-list">
+        <div class="version-block">
+          <span>VERSION</span>
+          <div class="version-picker" aria-label="Choose a Quartz version">
+            <button class="version-option" type="button" data-version="1">
+              <strong>1.1</strong>
+              <p>Legacy WebView2 release</p>
+            </button>
+            <button class="version-option active" type="button" data-version="2" data-current-version="true">
+              <strong>2.0</strong>
+              <p>Current release</p>
+            </button>
+          </div>
+        </div>
+        <ul class="change-list active" data-version-panel="2">
           <li><span>01</span><div><b>Chromium/CEF engine</b><p>Quartz now ships its own Chromium engine instead of depending on WebView2.</p></div></li>
           <li><span>02</span><div><b>Unpacked extensions</b><p>Manage compatible local Manifest V3 extension folders and persist them across restarts.</p></div></li>
           <li><span>03</span><div><b>CEF-native downloads</b><p>Download progress and actions remain inside the Quartz workspace through CEF callbacks.</p></div></li>
           <li><span>04</span><div><b>Isolated private profiles</b><p>Private windows use a separate in-memory Chromium request context.</p></div></li>
+        </ul>
+        <ul class="change-list" data-version-panel="1">
+          <li><span>01</span><div><b>First public installer</b><p>Quartz Version 1.1.0 introduced the first downloadable Windows installer for the browser.</p></div></li>
+          <li><span>02</span><div><b>WebView2 browser shell</b><p>The original release used Microsoft WebView2 with Chromium-based browsing, tabs, address/search, bookmarks, history, downloads, settings, and private mode.</p></div></li>
+          <li><span>03</span><div><b>Original Quartz basics</b><p>Version 1 included the first custom Quartz UI direction, theme support, site information, and permission prompts.</p></div></li>
+          <li><span>04</span><div><b>Archived release</b><p>Version 1 is kept for history while Version 2 is the recommended download. <a href="https://github.com/never-wet/quartz/releases/tag/v1.1.0">View the 1.1.0 release</a>.</p></div></li>
         </ul>
       </div>
     </section>
