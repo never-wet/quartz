@@ -19,10 +19,14 @@ internal sealed class CefPermissionHandler(
     {
         dispatcher.BeginInvoke(() =>
         {
-            var permission = DescribeMediaPermission(requestedPermissions);
-            var allowed = ShowPrompt(requestingOrigin, permission);
-            callback.Continue(allowed ? requestedPermissions : MediaAccessPermissionType.None);
-            callback.Dispose();
+            try
+            {
+                var permission = DescribeMediaPermission(requestedPermissions);
+                var allowed = ShowPrompt(requestingOrigin, permission);
+                callback.Continue(allowed ? requestedPermissions : MediaAccessPermissionType.None);
+            }
+            catch (Exception exception) { QuartzLog.Error("CEF media permission", exception); callback.Continue(MediaAccessPermissionType.None); }
+            finally { callback.Dispose(); }
         });
         return true;
     }
@@ -37,10 +41,14 @@ internal sealed class CefPermissionHandler(
     {
         dispatcher.BeginInvoke(() =>
         {
-            var permission = DescribePermission(requestedPermissions);
-            var allowed = ShowPrompt(requestingOrigin, permission);
-            callback.Continue(allowed ? PermissionRequestResult.Accept : PermissionRequestResult.Deny);
-            callback.Dispose();
+            try
+            {
+                var permission = DescribePermission(requestedPermissions);
+                var allowed = ShowPrompt(requestingOrigin, permission);
+                callback.Continue(allowed ? PermissionRequestResult.Accept : PermissionRequestResult.Deny);
+            }
+            catch (Exception exception) { QuartzLog.Error("CEF permission", exception); callback.Continue(PermissionRequestResult.Deny); }
+            finally { callback.Dispose(); }
         });
         return true;
     }

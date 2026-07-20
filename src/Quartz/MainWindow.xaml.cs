@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private BrowserTab? _activeTab;
     private bool _isPopulatingSettings;
     private int _visibleTabRow;
+    private readonly HashSet<string> _reportedUnsupportedExtensionUrls = new(StringComparer.OrdinalIgnoreCase);
 
     public MainWindow() : this(false) { }
 
@@ -321,7 +322,8 @@ public partial class MainWindow : Window
         tab.Browser.PermissionHandler = new CefPermissionHandler(this, Dispatcher);
         tab.Browser.RequestHandler = new CefRequestHandler(
             Dispatcher,
-            (url, error) => ShowCertificateWarning(tab, url, error));
+            (url, error) => ShowCertificateWarning(tab, url, error),
+            url => HandleUnsupportedExtensionNavigation(tab, url));
         tab.Browser.LifeSpanHandler = new CefLifeSpanHandler(
             Dispatcher,
             url => _ = CreateTabAsync(url));
@@ -446,6 +448,37 @@ public partial class MainWindow : Window
                 Navigate(tab, input);
             }
         }));
+    }
+
+    private void HandleUnsupportedExtensionNavigation(BrowserTab tab, string url)
+    {
+        try
+        {
+            StatusText.Text = "Chrome Web Store installation was blocked safely. Use Extensions for compatible ZIP or unpacked extensions.";
+            if (!_reportedUnsupportedExtensionUrls.Add(url))
+            {
+                return;
+            }
+
+            var choice = MessageBox.Show(
+                "Chrome Web Store direct installation is not supported yet in Quartz.\n\nQuartz supports compatible unpacked Chromium extensions and direct .zip packages. Chrome Web Store install APIs require Google Chrome and may not work in CEF.\n\nYes: open Extensions Manager\nNo: copy this request URL\nCancel: stay on this page",
+                "Chrome Web Store limitation",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Information);
+            if (choice == MessageBoxResult.Yes)
+            {
+                ToggleExtensionsPanel();
+            }
+            else if (choice == MessageBoxResult.No)
+            {
+                try { Clipboard.SetText(url); StatusText.Text = "Blocked Chrome Web Store URL copied to the clipboard."; }
+                catch (Exception exception) { QuartzLog.Error("Copy blocked extension URL", exception); }
+            }
+        }
+        catch (Exception exception)
+        {
+            QuartzLog.Error("Unsupported extension navigation", exception);
+        }
     }
 
     private void ShowCertificateWarning(BrowserTab tab, string url, CefErrorCode error)
@@ -1511,6 +1544,112 @@ public partial class MainWindow : Window
                 "Quartz extensions",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
+        }
+    }
+
+    private async void InstallExtensionFromUrlButton_Click(object sender, RoutedEventArgs e)
+    {
+        var address = PromptForText("Install extension from URL", "Enter a direct HTTPS/HTTP .zip extension package URL:");
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            return;
+        }
+
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            MessageBox.Show("Enter a direct HTTP or HTTPS .zip URL.", "Quartz extensions", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (uri.AbsolutePath.EndsWith(".crx", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Quartz does not unpack .crx files yet. Download or export a compatible .zip package, or load an unpacked extension folder.", "Chrome Web Store limitation", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!uri.AbsolutePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Quartz accepts direct .zip extension packages only. Chrome Web Store pages and source archives are not installable packages.", "Quartz extensions", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (MessageBox.Show("Extensions can read or change browsing data depending on their permissions. Download and install this package disabled first?", "Install extension", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var temporaryPackage = Path.Combine(Path.GetTempPath(), $"Quartz-extension-{Guid.NewGuid():N}.zip");
+        try
+        {
+            StatusText.Text = "Downloading extension package…";
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("QuartzBrowser/2.1");
+            await using (var source = await client.GetStreamAsync(uri))
+            await using (var target = File.Create(temporaryPackage))
+            {
+                await source.CopyToAsync(target);
+            }
+
+            StatusText.Text = "Extracting and validating extension…";
+            var extension = _extensionService.InstallZipPackage(temporaryPackage, "ZIP URL", isEnabled: false);
+            var permissionNote = string.IsNullOrWhiteSpace(extension.Permissions) ? "No manifest permissions were listed." : $"Permissions: {extension.Permissions}";
+            if (MessageBox.Show($"{extension.Name} was installed disabled.\n\n{permissionNote}\n\nEnable it when Quartz next restarts?", "Enable extension", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                _extensionService.SetEnabled(extension, true);
+            }
+
+            StatusText.Text = $"{extension.Name} installed. Restart Quartz to apply extension changes.";
+        }
+        catch (Exception exception) when (exception is HttpRequestException or IOException or ArgumentException or InvalidDataException or UnauthorizedAccessException)
+        {
+            MessageBox.Show($"Quartz could not install this extension package.\n\n{exception.Message}", "Quartz extensions", MessageBoxButton.OK, MessageBoxImage.Warning);
+            StatusText.Text = "Extension installation failed.";
+        }
+        finally
+        {
+            if (File.Exists(temporaryPackage)) File.Delete(temporaryPackage);
+        }
+    }
+
+    private string? PromptForText(string title, string prompt)
+    {
+        var input = new TextBox { MinWidth = 360, Margin = new Thickness(0, 8, 0, 14) };
+        var dialog = new Window
+        {
+            Title = title,
+            Owner = this,
+            Width = 470,
+            Height = 165,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Background = (Brush)FindResource("QuartzCanvasBrush"),
+            Content = new StackPanel { Margin = new Thickness(18), Children = { new TextBlock { Text = prompt, TextWrapping = TextWrapping.Wrap }, input } }
+        };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = new Button { Content = "Cancel", Width = 80, Margin = new Thickness(0, 0, 8, 0) };
+        cancel.Click += (_, _) => dialog.DialogResult = false;
+        var install = new Button { Content = "Continue", Width = 80, Style = (Style)FindResource("AccentButtonStyle") };
+        install.Click += (_, _) => dialog.DialogResult = true;
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(install);
+        ((StackPanel)dialog.Content).Children.Add(buttons);
+        return dialog.ShowDialog() == true ? input.Text.Trim() : null;
+    }
+
+    private void ReloadExtensionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: BrowserExtension extension })
+        {
+            try { _extensionService.AddUnpacked(extension.FolderPath, extension.SourceType, extension.IsEnabled); StatusText.Text = "Extension metadata reloaded. Restart Quartz to apply changes."; }
+            catch (Exception exception) when (exception is ArgumentException or IOException or JsonException) { MessageBox.Show(exception.Message, "Quartz extensions", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        }
+    }
+
+    private void OpenExtensionFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: BrowserExtension extension } && Directory.Exists(extension.FolderPath))
+        {
+            Process.Start(new ProcessStartInfo(extension.FolderPath) { UseShellExecute = true });
         }
     }
 

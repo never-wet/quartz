@@ -20,8 +20,10 @@ internal sealed class CefDownloadHandler(
         CefDownloadItem downloadItem,
         IBeforeDownloadCallback callback)
     {
+        try
+        {
         var savePath = dispatcher.Invoke(() =>
-            downloadService.CreateSavePath(downloadItem.SuggestedFileName, downloadItem.Url));
+            downloadService.CreateSavePath(downloadItem?.SuggestedFileName, downloadItem?.Url));
 
         dispatcher.Invoke(() =>
         {
@@ -37,6 +39,12 @@ internal sealed class CefDownloadHandler(
 
         callback.Continue(savePath, showDialog: false);
         return true;
+        }
+        catch (Exception exception)
+        {
+            QuartzLog.Error("CEF download start", exception);
+            return true;
+        }
     }
 
     protected override void OnDownloadUpdated(
@@ -45,6 +53,8 @@ internal sealed class CefDownloadHandler(
         CefDownloadItem downloadItem,
         IDownloadItemCallback callback)
     {
+        try
+        {
         lock (_callbackLock)
         {
             if (_callbacks.Remove(downloadItem.Id, out var previous) && !ReferenceEquals(previous, callback))
@@ -81,6 +91,11 @@ internal sealed class CefDownloadHandler(
                 ReleaseCallback(downloadItem.Id);
             }
         });
+        }
+        catch (Exception exception)
+        {
+            QuartzLog.Error("CEF download update", exception);
+        }
     }
 
     private void Cancel(int downloadId)

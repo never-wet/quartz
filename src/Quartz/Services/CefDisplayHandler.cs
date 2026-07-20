@@ -10,6 +10,7 @@ internal sealed class CefDisplayHandler(Action<string?> faviconChanged) : Displa
         IBrowser browser,
         IList<string> urls)
     {
-        faviconChanged(urls.FirstOrDefault());
+        try { faviconChanged(urls?.FirstOrDefault()); }
+        catch (Exception exception) { QuartzLog.Error("CEF favicon callback", exception); }
     }
 }

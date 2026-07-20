@@ -174,6 +174,16 @@ See [update.md](update.md) for the release history.
 
 Quartz checks the public GitHub Releases API for `never-wet/quartz` (no update server or paid service). In **Settings → Quartz updates**, users can check manually, enable startup checks, download a signed release installer, and choose **Restart to update**. Installers are accepted only when they match `Quartz-<version>-Setup.exe`; Quartz verifies `SHA256SUMS.txt` whenever the release provides it.
 
+## Experimental Chromium extensions
+
+Quartz can load local unpacked Manifest V3 extensions and install compatible direct `.zip` packages from **Extensions**. ZIP archives are extracted under `%LOCALAPPDATA%\Quartz\Extensions` with path-traversal checks and must contain `manifest.json`. New ZIP installs remain disabled until confirmed, and all extension changes require a Quartz restart because CEF loads enabled folders at startup. `.crx` packages and direct Chrome Web Store installation are not supported; some Chromium extensions depend on Chrome-only APIs and will not work in CEF.
+
+Chrome Web Store pages can be viewed, but Quartz safely blocks unsupported Store install/update requests and offers the Extensions manager or copying the blocked request URL. Callback failures are written to `%LOCALAPPDATA%\Quartz\Logs\quartz.log` without recording page content.
+
+## Chromium startup troubleshooting
+
+Quartz validates its bundled x64 Chromium files before startup and writes CEF diagnostics to `%LOCALAPPDATA%\Quartz\Logs\cef.log`. A full initialization failure is recorded in `%LOCALAPPDATA%\Quartz\Logs\startup.log`, and the error dialog includes its path. Hold **Shift** while launching Quartz, or use `--safe-mode`, to start with extensions disabled; invalid or deleted extension folders are skipped and logged. Reinstall using the x64 installer if the startup log reports missing CEF runtime files. The installer recursively copies the published CEF runtime and installs the Microsoft Visual C++ 2015–2022 x64 runtime when required.
+
 To publish an update: update the version in `src/Quartz/Quartz.csproj` and `installer/Quartz.iss`, build `Quartz-<version>-Setup.exe`, create a stable GitHub release tag such as `v2.1.0`, upload that installer and a `SHA256SUMS.txt` containing its SHA-256 hash. Existing user data stays under `%LOCALAPPDATA%\Quartz`, outside the installer directory.
 ## Tab management
 

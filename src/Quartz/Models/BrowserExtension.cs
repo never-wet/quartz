@@ -16,6 +16,16 @@ internal sealed class BrowserExtension : INotifyPropertyChanged
 
     public int ManifestVersion { get; set; }
 
+    public string Id { get; set; } = string.Empty;
+
+    public string Description { get; set; } = string.Empty;
+
+    public string Permissions { get; set; } = string.Empty;
+
+    public DateTimeOffset InstalledAt { get; set; } = DateTimeOffset.Now;
+
+    public string SourceType { get; set; } = "Local folder";
+
     public bool IsEnabled
     {
         get => _isEnabled;

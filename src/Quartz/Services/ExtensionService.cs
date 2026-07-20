@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Quartz.Models;
 
@@ -16,10 +18,12 @@ internal sealed class ExtensionService
     };
 
     private readonly string _filePath;
+    private readonly string _managedExtensionsDirectory;
 
     private ExtensionService(string filePath)
     {
         _filePath = filePath;
+        _managedExtensionsDirectory = Path.Combine(Path.GetDirectoryName(filePath)!, "Extensions");
         Load();
     }
 
@@ -36,14 +40,18 @@ internal sealed class ExtensionService
             : Path.GetFullPath(overridePath));
     }
 
-    public IReadOnlyList<string> GetEnabledFolders() =>
-        Extensions
-            .Where(extension => extension.IsEnabled && IsValidExtensionFolder(extension.FolderPath))
-            .Select(extension => extension.FolderPath)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+    public IReadOnlyList<string> GetEnabledFolders()
+    {
+        var valid = new List<string>();
+        foreach (var extension in Extensions.Where(extension => extension.IsEnabled))
+        {
+            if (IsValidExtensionFolder(extension.FolderPath)) valid.Add(extension.FolderPath);
+            else QuartzLog.Error("Extension startup validation", new InvalidDataException($"Skipped invalid extension folder: {extension.Name}"));
+        }
+        return valid.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
 
-    public BrowserExtension AddUnpacked(string folderPath)
+    public BrowserExtension AddUnpacked(string folderPath, string sourceType = "Local folder", bool isEnabled = true)
     {
         var fullPath = Path.GetFullPath(folderPath);
         var manifestPath = Path.Combine(fullPath, "manifest.json");
@@ -56,6 +64,10 @@ internal sealed class ExtensionService
         var root = document.RootElement;
         var name = GetRequiredString(root, "name");
         var version = GetRequiredString(root, "version");
+        var description = root.TryGetProperty("description", out var descriptionElement) && descriptionElement.ValueKind == JsonValueKind.String ? descriptionElement.GetString() ?? string.Empty : string.Empty;
+        var permissions = root.TryGetProperty("permissions", out var permissionsElement) && permissionsElement.ValueKind == JsonValueKind.Array
+            ? string.Join(", ", permissionsElement.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()))
+            : string.Empty;
         var manifestVersion = root.TryGetProperty("manifest_version", out var manifestVersionElement) &&
                               manifestVersionElement.TryGetInt32(out var parsedManifestVersion)
             ? parsedManifestVersion
@@ -72,7 +84,10 @@ internal sealed class ExtensionService
             existing.Name = name;
             existing.Version = version;
             existing.ManifestVersion = manifestVersion;
-            existing.IsEnabled = true;
+            existing.Description = description;
+            existing.Permissions = permissions;
+            existing.SourceType = sourceType;
+            existing.IsEnabled = isEnabled;
             Save();
             return existing;
         }
@@ -83,7 +98,12 @@ internal sealed class ExtensionService
             Version = version,
             FolderPath = fullPath,
             ManifestVersion = manifestVersion,
-            IsEnabled = true
+            IsEnabled = isEnabled,
+            Id = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(fullPath))).ToLowerInvariant()[..32],
+            Description = description,
+            Permissions = permissions,
+            SourceType = sourceType,
+            InstalledAt = DateTimeOffset.Now
         };
         Extensions.Add(extension);
         Save();
@@ -100,6 +120,48 @@ internal sealed class ExtensionService
     {
         Extensions.Remove(extension);
         Save();
+    }
+
+    public BrowserExtension InstallZipPackage(string packagePath, string sourceType, bool isEnabled = false)
+    {
+        if (!string.Equals(Path.GetExtension(packagePath), ".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Only .zip extension packages are supported. .crx packages must be unpacked manually.");
+        }
+
+        Directory.CreateDirectory(_managedExtensionsDirectory);
+        var destination = Path.Combine(_managedExtensionsDirectory, $"extension-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(destination);
+        try
+        {
+            using var archive = ZipFile.OpenRead(packagePath);
+            foreach (var entry in archive.Entries)
+            {
+                var target = Path.GetFullPath(Path.Combine(destination, entry.FullName));
+                if (!target.StartsWith(destination + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("The extension archive contains an unsafe path.");
+                }
+
+                if (string.IsNullOrEmpty(entry.Name)) Directory.CreateDirectory(target);
+                else
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                    entry.ExtractToFile(target, overwrite: false);
+                }
+            }
+
+            var manifestFolder = File.Exists(Path.Combine(destination, "manifest.json"))
+                ? destination
+                : Directory.EnumerateDirectories(destination).FirstOrDefault(folder => File.Exists(Path.Combine(folder, "manifest.json")));
+            if (manifestFolder is null) throw new ArgumentException("The package does not contain a manifest.json extension folder.");
+            return AddUnpacked(manifestFolder, sourceType, isEnabled);
+        }
+        catch
+        {
+            if (Directory.Exists(destination)) Directory.Delete(destination, recursive: true);
+            throw;
+        }
     }
 
     private void Load()

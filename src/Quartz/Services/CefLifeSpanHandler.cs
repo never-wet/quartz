@@ -23,10 +23,11 @@ internal sealed class CefLifeSpanHandler(
         out IWebBrowser? newBrowser)
     {
         newBrowser = null;
-        if (!string.IsNullOrWhiteSpace(targetUrl))
+        try
         {
-            dispatcher.BeginInvoke(() => openInNewTab(targetUrl));
+            if (!string.IsNullOrWhiteSpace(targetUrl)) dispatcher.BeginInvoke(() => openInNewTab(targetUrl));
         }
+        catch (Exception exception) { QuartzLog.Error("CEF popup callback", exception); }
 
         return true;
     }

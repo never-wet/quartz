@@ -88,7 +88,7 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Quartz installer compilation failed.'
 }
 
-$installerPath = Join-Path $releasePath 'Quartz-2.0.0-Setup.exe'
+$installerPath = Join-Path $releasePath 'Quartz-2.1.0-Setup.exe'
 $installer = Get-Item $installerPath
 $sizeMb = [Math]::Round($installer.Length / 1MB, 1)
 Write-Host "Created $installerPath ($sizeMb MB)"

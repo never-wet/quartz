@@ -13,6 +13,9 @@ Latest completed update: **2.1**
 - Added a free GitHub Releases update checker and installer downloader.
 - Added optional startup checks, Settings update status, download progress, checksum verification when `SHA256SUMS.txt` is supplied, and restart-to-install handoff.
 - Inno Setup updates use the same AppId and preserve `%LOCALAPPDATA%\Quartz` browser data.
+- Expanded the experimental extension manager with direct ZIP URL installation, manifest validation, permission display, safe archive extraction, reload/open-folder controls, and honest Chrome Web Store/.crx limitations.
+- Blocked unsupported Chrome Web Store install/update requests before CEF handles them, added a friendly recovery prompt, and added defensive CEF callback logging under `%LOCALAPPDATA%\Quartz\Logs`.
+- Added CEF runtime preflight validation, detailed startup error logging, CEF log output, extension-safe startup filtering, and an extensions-disabled safe-mode fallback (`Shift` or `--safe-mode`).
 
 ## Version 2.0
 

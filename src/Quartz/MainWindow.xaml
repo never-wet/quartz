@@ -370,6 +370,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
                                        VerticalAlignment="Center"
@@ -877,6 +879,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                                 <Border Width="4" Height="22" Margin="0,0,9,0" Background="{DynamicResource QuartzAccentBrush}" CornerRadius="2" />
@@ -891,6 +894,13 @@
                                     ToolTip="Choose a local extension folder containing manifest.json"
                                     Click="LoadUnpackedExtensionButton_Click" />
                             <Button Grid.Column="2"
+                                    Height="30"
+                                    Margin="0,0,8,0"
+                                    Padding="10,0"
+                                    Content="Install from URL"
+                                    ToolTip="Install a compatible .zip extension package from a direct URL"
+                                    Click="InstallExtensionFromUrlButton_Click" />
+                            <Button Grid.Column="3"
                                     Style="{StaticResource PanelCloseButtonStyle}"
                                     Content="&#x00D7;"
                                     ToolTip="Close extensions"
@@ -931,6 +941,7 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -949,27 +960,36 @@
                                                    Margin="0,5,0,0"
                                                    Foreground="{DynamicResource QuartzMutedTextBrush}"
                                                    FontSize="10"
+                                                   Text="{Binding Description}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
+                                                   Margin="0,3,0,0"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   FontSize="10"
                                                    Text="{Binding FolderPath}"
                                                    ToolTip="{Binding FolderPath}"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
+                                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2"
                                                    Margin="0,4,0,8"
                                                    Foreground="{DynamicResource QuartzMutedTextBrush}"
                                                    FontSize="11"
                                                    Text="{Binding Status}" />
-                                        <CheckBox Grid.Row="3" Grid.Column="0"
+                                        <CheckBox Grid.Row="4" Grid.Column="0"
                                                   VerticalAlignment="Center"
                                                   Content="Enabled"
                                                   IsChecked="{Binding IsEnabled}"
                                                   Tag="{Binding}"
                                                   Click="ExtensionEnabledCheckBox_Click" />
-                                        <Button Grid.Row="3" Grid.Column="1"
-                                                Height="28"
+                                        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal">
+                                            <Button Height="28" Margin="0,0,5,0" Padding="8,0" Content="Reload" Tag="{Binding}" Click="ReloadExtensionButton_Click" />
+                                            <Button Height="28" Margin="0,0,5,0" Padding="8,0" Content="Folder" Tag="{Binding}" Click="OpenExtensionFolderButton_Click" />
+                                            <Button Height="28"
                                                 Padding="10,0"
                                                 Style="{StaticResource QuartzButtonStyle}"
                                                 Content="Remove"
                                                 Tag="{Binding}"
                                                 Click="RemoveExtensionButton_Click" />
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
