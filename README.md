@@ -2,7 +2,7 @@
 
 Quartz is a small Windows web browser prototype. It uses C#, .NET 8, WPF, and Microsoft Edge WebView2 (Chromium).
 
-## Version 0.10.1 features and fixes
+## Version 1.1 features and fixes
 
 - One browser window with multiple tabs
 - New tab button
@@ -84,6 +84,37 @@ dotnet run --project .\src\Quartz\Quartz.csproj
 
 In Visual Studio, open `Quartz.sln`, set `Quartz` as the startup project, and press `F5`.
 
+## Publish and build the Windows installer
+
+Quartz ships as a self-contained 64-bit Windows application, so end users do not need to install .NET separately. From the repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
+```
+
+The packaging script performs these steps:
+
+1. Publishes Quartz self-contained for `win-x64` to `artifacts\publish\win-x64`.
+2. Downloads Microsoft's official WebView2 Evergreen bootstrapper when it is not already cached.
+3. Uses Inno Setup 7, preparing a local compiler under `.tools\InnoSetup` when necessary.
+4. Produces the public installer at `release\QuartzSetup.exe`.
+
+The installer uses a branded dark Quartz wizard, installs per-user to `%LOCALAPPDATA%\Programs\Quartz`, creates a Start Menu shortcut, offers an optional Desktop shortcut and launch action, and registers a normal Windows uninstall entry. WebView2 is installed silently only if the Evergreen Runtime is missing.
+
+Before publishing Quartz broadly, sign both the application executable and `QuartzSetup.exe` with a trusted Windows code-signing certificate. The locally generated installer is intentionally unsigned.
+
+## Preview and deploy the download homepage
+
+The responsive static product site is in `website/` and has no build-time dependencies. After building the installer, preview it from the repository root:
+
+```powershell
+python -m http.server 8080
+```
+
+Open `http://localhost:8080/website/`. Its download buttons point to `../release/QuartzSetup.exe`, which works with this repository layout. For independent hosting, replace the three installer links in `website/index.html` with the final hosted release URL. Update the version, file size, release date, and changelog copy on each public release.
+
+For an installer smoke test, run `release\QuartzSetup.exe`, select the optional Desktop shortcut, complete setup, launch Quartz, confirm both shortcuts work, and uninstall **Quartz Browser** from Windows Settings > Apps > Installed apps.
+
 ## Using Quartz
 
 - Enter a full URL such as `https://github.com` and press Enter.
@@ -126,7 +157,7 @@ The security indicator reports the active URL's connection scheme after WebView2
 
 ## Verification checklist
 
-Use this Version 0.10.1 regression test:
+Use this Version 1.1 regression test:
 
 1. Launch Quartz and confirm its diamond icon appears in the title bar and taskbar.
 2. Visit Google and GitHub in separate tabs. Confirm each tab shows its site favicon, the active tab is distinct, and long titles trim cleanly.
@@ -214,6 +245,16 @@ Also confirm that Back and Forward enable only when available, the loading indic
 
 ```text
 Quartz.sln
+website/
+  index.html                 Responsive Quartz download homepage
+  styles.css                 Quartz product-site design system and breakpoints
+  app.js                     Local anchor navigation
+installer/
+  Quartz.iss                 Branded Inno Setup installer definition
+  build-installer.ps1        Self-contained publish and installer build script
+  assets/                    Quartz installer wizard artwork
+release/
+  QuartzSetup.exe            Public Windows installer artifact
 src/Quartz/
   App.xaml                  Shared Quartz palette and reusable control styles
   Assets/Quartz.ico        Packaged window, taskbar, executable, and fallback tab icon

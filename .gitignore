@@ -4,3 +4,6 @@ obj/
 *.user
 *.suo
 TestResults/
+.tools/
+artifacts/
+installer/dependencies/

@@ -9,6 +9,12 @@
     <AssemblyName>Quartz</AssemblyName>
     <RootNamespace>Quartz</RootNamespace>
     <ApplicationIcon>Assets\Quartz.ico</ApplicationIcon>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <Product>Quartz Browser</Product>
+    <Description>Quartz is a focused Windows web browser built with WPF and WebView2.</Description>
+    <Copyright>Copyright © 2026 Quartz contributors</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

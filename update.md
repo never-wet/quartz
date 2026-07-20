@@ -72,6 +72,16 @@ Expected 1.1 acceptance checklist:
 - Duplicate `DownloadsWindow.xaml.cs` outside `src/Quartz` is removed or excluded.
 - The project builds successfully.
 
+Release and distribution work completed for 1.1:
+
+- Added a responsive dark Quartz product homepage with an above-the-fold Windows download action.
+- Added a custom browser-interface preview, feature overview, system requirements, release notes, and installer metadata.
+- Added self-contained `win-x64` publishing so end users do not need to install .NET 8 separately.
+- Added a branded Inno Setup installer with Start Menu integration, optional Desktop shortcut, launch option, and Windows uninstall support.
+- Added conditional Microsoft WebView2 Evergreen setup for systems where the runtime is missing.
+- Added a reproducible packaging script that creates `release/QuartzSetup.exe`.
+- Documented local website preview, hosted download-link replacement, installer testing, and the need for production code signing.
+
 ## Known Issues To Watch
 
 - Resource controls should not claim to limit CPU, memory, or network unless real limiting is implemented.
