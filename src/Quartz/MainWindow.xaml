@@ -32,7 +32,7 @@
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="36" />
+            <RowDefinition Height="40" />
             <RowDefinition Height="44" />
             <RowDefinition x:Name="BookmarksBarRow" Height="0" />
             <RowDefinition Height="*" />
@@ -41,35 +41,66 @@
 
         <Border x:Name="TabStripBorder"
                 Grid.Row="0"
-                Padding="5,0"
+                Padding="5,2"
                 Background="{DynamicResource QuartzTabStripBrush}"
                 BorderBrush="{DynamicResource QuartzBorderBrush}"
                 BorderThickness="0,0,0,1">
-            <DockPanel LastChildFill="True">
-                <Button x:Name="CloseWindowButton"
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource WindowCaptionButtonStyle}"
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ItemsControl x:Name="TabStripItems"
+                              Grid.Column="0"
+                              VerticalAlignment="Center"
+                              WindowChrome.IsHitTestVisibleInChrome="True">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="4" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Border x:Name="PrivateModeBadge"
                         WindowChrome.IsHitTestVisibleInChrome="True"
-                        Content="&#x00D7;"
-                        FontSize="18"
-                        ToolTip="Close"
-                        Click="CloseWindowButton_Click" />
-                <Button x:Name="MaximizeRestoreWindowButton"
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        Margin="5,6,3,5"
+                        Padding="9,2"
+                        Background="{DynamicResource QuartzPrivateBrush}"
+                        CornerRadius="9"
+                        Visibility="Collapsed">
+                    <TextBlock Foreground="{DynamicResource QuartzPrivateTextBrush}" FontSize="10" FontWeight="Bold" Text="PRIVATE" />
+                </Border>
+                <Button x:Name="TabManagerButton"
+                        Style="{StaticResource ToolbarButtonStyle}"
                         WindowChrome.IsHitTestVisibleInChrome="True"
-                        Content="&#x25A1;"
-                        ToolTip="Maximize"
-                        Click="MaximizeRestoreWindowButton_Click" />
-                <Button x:Name="MinimizeWindowButton"
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        Width="30"
+                        Height="30"
+                        Margin="3,3,2,2"
+                        Content="&#x25A6;"
+                        FontSize="16"
+                        ToolTip="All tabs (Ctrl+Shift+A)"
+                        Click="TabManagerButton_Click" />
+                <Button x:Name="TabRowUpButton"
+                        Style="{StaticResource ToolbarButtonStyle}"
                         WindowChrome.IsHitTestVisibleInChrome="True"
-                        Content="&#x2014;"
-                        ToolTip="Minimize"
-                        Click="MinimizeWindowButton_Click" />
+                        Width="24"
+                        Height="30"
+                        Margin="1,3,0,2"
+                        Content="&#x25B2;"
+                        FontSize="11"
+                        ToolTip="Previous tab row"
+                        Click="TabRowUpButton_Click" />
+                <Button x:Name="TabRowDownButton"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Width="24"
+                        Height="30"
+                        Margin="0,3,2,2"
+                        Content="&#x25BC;"
+                        FontSize="11"
+                        ToolTip="Next tab row"
+                        Click="TabRowDownButton_Click" />
                 <Button x:Name="NewTabButton"
-                        DockPanel.Dock="Right"
                         Style="{StaticResource ToolbarButtonStyle}"
                         WindowChrome.IsHitTestVisibleInChrome="True"
                         Width="30"
@@ -79,22 +110,27 @@
                         FontSize="20"
                         ToolTip="New tab (Ctrl+T)"
                         Click="NewTabButton_Click" />
-
-                <Border x:Name="PrivateModeBadge"
-                        DockPanel.Dock="Right"
+                <Button x:Name="MinimizeWindowButton"
                         WindowChrome.IsHitTestVisibleInChrome="True"
-                        Margin="5,6,3,5"
-                        Padding="9,2"
-                        Background="{DynamicResource QuartzPrivateBrush}"
-                        CornerRadius="9"
-                        Visibility="Collapsed">
-                    <TextBlock Foreground="{DynamicResource QuartzPrivateTextBrush}" FontSize="10" FontWeight="Bold" Text="PRIVATE" />
-                </Border>
-
-                <TabControl x:Name="Tabs"
-                            WindowChrome.IsHitTestVisibleInChrome="True"
-                            SelectionChanged="Tabs_SelectionChanged" />
-            </DockPanel>
+                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        Content="&#x2014;"
+                        ToolTip="Minimize"
+                        Click="MinimizeWindowButton_Click" />
+                <Button x:Name="MaximizeRestoreWindowButton"
+                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Content="&#x25A1;"
+                        ToolTip="Maximize"
+                        Click="MaximizeRestoreWindowButton_Click" />
+                <Button x:Name="CloseWindowButton"
+                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Content="&#x00D7;"
+                        FontSize="18"
+                        ToolTip="Close"
+                        Click="CloseWindowButton_Click" />
+                </StackPanel>
+            </Grid>
         </Border>
 
         <Border x:Name="ToolbarBorder"
@@ -183,34 +219,6 @@
                         ToolTip="Bookmark this page (Ctrl+D)"
                         IsEnabled="False"
                         Click="BookmarkButton_Click" />
-
-                <Button x:Name="HistoryButton"
-                        Grid.Column="7"
-                        Style="{StaticResource ToolbarButtonStyle}"
-                        Content="&#x25F4;"
-                        ToolTip="Show history (Ctrl+H)"
-                        Click="HistoryButton_Click" />
-
-                <Button x:Name="DownloadsButton"
-                        Grid.Column="8"
-                        Style="{StaticResource ToolbarButtonStyle}"
-                        Content="&#x2193;"
-                        ToolTip="Open downloads (Ctrl+J)"
-                        Click="DownloadsButton_Click" />
-
-                <Button x:Name="SettingsButton"
-                        Grid.Column="9"
-                        Style="{StaticResource ToolbarButtonStyle}"
-                        Content="&#x2699;"
-                        ToolTip="Show settings (Ctrl+,)"
-                        Click="SettingsButton_Click" />
-
-                <Button x:Name="PrivateWindowButton"
-                        Grid.Column="10"
-                        Style="{StaticResource ToolbarButtonStyle}"
-                        Content="&#x25C7;"
-                        ToolTip="New private window (Ctrl+Shift+N)"
-                        Click="NewPrivateWindowButton_Click" />
 
                 <StackPanel x:Name="LoadingStatusPanel"
                             Grid.Column="11"
@@ -1002,6 +1010,49 @@
                                 </StackPanel>
                             </Border>
                         </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border x:Name="TabManagerOverlay"
+                    Grid.Row="0"
+                    Grid.ColumnSpan="3"
+                    Margin="18"
+                    Panel.ZIndex="20"
+                    Background="{DynamicResource QuartzCanvasBrush}"
+                    BorderBrush="{DynamicResource QuartzBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="58" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}" CornerRadius="12,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="4" Height="24" Margin="0,0,10,0" Background="{DynamicResource QuartzAccentBrush}" CornerRadius="2" />
+                                <StackPanel>
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="All tabs" />
+                                    <TextBlock x:Name="TabManagerCount" Margin="0,1,0,0" FontSize="11" Foreground="{DynamicResource QuartzMutedTextBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                            <Button Grid.Column="1" Height="30" Margin="0,0,8,0" Padding="11,0" Content="Clear all tabs" ToolTip="Close every tab and open a fresh new tab" Click="ClearAllTabsButton_Click" />
+                            <Button Grid.Column="2" Style="{StaticResource PanelCloseButtonStyle}" Content="&#x00D7;" ToolTip="Close tab manager (Escape)" Click="CloseTabManagerButton_Click" />
+                        </Grid>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" Margin="16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="TabManagerItems">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
                     </ScrollViewer>
                 </Grid>
             </Border>

@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 using CefSharp.Wpf;
 
@@ -7,7 +8,8 @@ internal sealed class BrowserTab(ChromiumWebBrowser browser) : IDisposable
 {
     public ChromiumWebBrowser Browser { get; } = browser;
 
-    public TabItem HeaderItem { get; set; } = null!;
+    // The strip owns a lightweight header view; the Chromium browser remains independent of it.
+    public FrameworkElement HeaderItem { get; set; } = null!;
 
     public TextBlock TitleBlock { get; set; } = null!;
 

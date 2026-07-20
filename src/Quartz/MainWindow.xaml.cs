@@ -30,8 +30,10 @@ public partial class MainWindow : Window
     private readonly ExtensionService _extensionService;
     private readonly IRequestContext _requestContext;
     private readonly bool _ownsRequestContext;
+    private const int TabsPerRow = 4;
     private BrowserTab? _activeTab;
     private bool _isPopulatingSettings;
+    private int _visibleTabRow;
 
     public MainWindow() : this(false) { }
 
@@ -76,8 +78,6 @@ public partial class MainWindow : Window
             StatusText.Text = "Private browsing · history is not saved";
             PrivateModeBadge.Visibility = Visibility.Visible;
             ToolbarBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("QuartzPrivateBrush");
-            PrivateWindowButton.Foreground = (System.Windows.Media.Brush)FindResource("QuartzPrivateBrush");
-            PrivateWindowButton.ToolTip = "Private profile active. Bookmarks created here are saved normally.";
             DownloadsHeading.Text = "Private Downloads";
             PrivateDownloadNotice.Visibility = Visibility.Visible;
         }
@@ -129,7 +129,7 @@ public partial class MainWindow : Window
     {
         while (source is not null)
         {
-            if (source is Button or TabItem)
+            if (source is Button or TabItem || source is FrameworkElement { Tag: BrowserTab })
             {
                 return true;
             }
@@ -187,8 +187,7 @@ public partial class MainWindow : Window
         tab.IsInitialized = true;
 
         _tabs.Add(tab);
-        Tabs.Items.Add(tab.HeaderItem);
-        Tabs.SelectedItem = tab.HeaderItem;
+        RefreshTabStrip();
         SetActiveTab(tab);
 
         try
@@ -224,7 +223,7 @@ public partial class MainWindow : Window
         return Task.CompletedTask;
     }
 
-    private TabItem CreateTabHeader(BrowserTab tab)
+    private Border CreateTabHeader(BrowserTab tab)
     {
         var favicon = new Image
         {
@@ -239,7 +238,7 @@ public partial class MainWindow : Window
         var title = new TextBlock
         {
             Text = "New tab",
-            Width = 150,
+            MinWidth = 0,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -260,15 +259,46 @@ public partial class MainWindow : Window
         tab.TitleBlock = title;
         tab.FaviconImage = favicon;
 
-        return new TabItem
+        var content = new Grid();
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(favicon, 0);
+        Grid.SetColumn(title, 1);
+        Grid.SetColumn(closeButton, 2);
+        content.Children.Add(favicon);
+        content.Children.Add(title);
+        content.Children.Add(closeButton);
+
+        var header = new Border
         {
-            Header = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Children = { favicon, title, closeButton }
-            },
-            Tag = tab
+            Tag = tab,
+            Height = 32,
+            Margin = new Thickness(1),
+            Padding = new Thickness(9, 0, 6, 0),
+            CornerRadius = new CornerRadius(8, 8, 3, 3),
+            BorderThickness = new Thickness(1),
+            Child = content,
+            Cursor = Cursors.Hand,
+            ToolTip = "Switch tab"
         };
+        header.MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                SetActiveTab(tab);
+                e.Handled = true;
+            }
+        };
+        header.MouseEnter += (_, _) =>
+        {
+            if (tab != _activeTab)
+            {
+                header.SetResourceReference(Border.BackgroundProperty, "QuartzHoverBrush");
+            }
+        };
+        header.MouseLeave += (_, _) => UpdateTabHeaderStyles();
+        return header;
     }
 
     private void ConfigureBrowser(BrowserTab tab)
@@ -392,6 +422,10 @@ public partial class MainWindow : Window
             var browserTitle = tab.Browser.Title;
             tab.Title = tab.IsNewTabPage || string.IsNullOrWhiteSpace(browserTitle) ? "New tab" : browserTitle;
             tab.TitleBlock.Text = tab.Title;
+            if (TabManagerOverlay.Visibility == Visibility.Visible)
+            {
+                RenderTabManagerCards();
+            }
             if (tab == _activeTab)
             {
                 UpdateWindowTitle();
@@ -473,6 +507,10 @@ public partial class MainWindow : Window
         }
 
         tab.FaviconImage.Source = favicon ?? DefaultTabIcon;
+        if (TabManagerOverlay.Visibility == Visibility.Visible)
+        {
+            RenderTabManagerCards();
+        }
     }
 
     private static ImageSource CreateFaviconImage(Stream stream)
@@ -571,6 +609,7 @@ public partial class MainWindow : Window
     private void SetActiveTab(BrowserTab? tab)
     {
         _activeTab = tab;
+        EnsureActiveTabRowIsVisible();
         BrowserHost.Children.Clear();
 
         if (tab is not null)
@@ -586,6 +625,89 @@ public partial class MainWindow : Window
         UpdateSiteInfoPanel();
         SetLoadingState(tab?.IsLoading == true);
         StatusText.Text = tab?.Status ?? "No tabs open";
+        UpdateTabHeaderStyles();
+        if (TabManagerOverlay.Visibility == Visibility.Visible)
+        {
+            RenderTabManagerCards();
+        }
+    }
+
+    private void UpdateTabHeaderStyles()
+    {
+        foreach (var browserTab in _tabs)
+        {
+            if (browserTab.HeaderItem is not Border header)
+            {
+                continue;
+            }
+
+            var isActive = browserTab == _activeTab;
+            header.SetResourceReference(Border.BackgroundProperty, isActive ? "QuartzSurfaceBrush" : "QuartzTabStripBrush");
+            header.SetResourceReference(Border.BorderBrushProperty, isActive ? "QuartzAccentBrush" : "QuartzBorderBrush");
+            header.BorderThickness = isActive ? new Thickness(1, 1, 1, 2) : new Thickness(1);
+            browserTab.TitleBlock.SetResourceReference(TextBlock.ForegroundProperty, isActive ? "QuartzTextBrush" : "QuartzMutedTextBrush");
+            browserTab.TitleBlock.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+    }
+
+    private void RefreshTabStrip()
+    {
+        var rowCount = Math.Max(1, (int)Math.Ceiling(_tabs.Count / (double)TabsPerRow));
+        _visibleTabRow = Math.Clamp(_visibleTabRow, 0, rowCount - 1);
+
+        TabStripItems.Items.Clear();
+        foreach (var tab in _tabs.Skip(_visibleTabRow * TabsPerRow).Take(TabsPerRow))
+        {
+            TabStripItems.Items.Add(tab.HeaderItem);
+        }
+
+        TabRowUpButton.IsEnabled = _visibleTabRow > 0;
+        TabRowDownButton.IsEnabled = _visibleTabRow < rowCount - 1;
+        UpdateTabHeaderStyles();
+    }
+
+    private void EnsureActiveTabRowIsVisible()
+    {
+        if (_activeTab is null)
+        {
+            return;
+        }
+
+        var activeIndex = _tabs.IndexOf(_activeTab);
+        if (activeIndex < 0)
+        {
+            return;
+        }
+
+        var activeRow = activeIndex / TabsPerRow;
+        if (activeRow != _visibleTabRow)
+        {
+            _visibleTabRow = activeRow;
+            RefreshTabStrip();
+        }
+    }
+
+    private void TabRowUpButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowTabRow(_visibleTabRow - 1);
+    }
+
+    private void TabRowDownButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowTabRow(_visibleTabRow + 1);
+    }
+
+    private void ShowTabRow(int row)
+    {
+        var rowCount = Math.Max(1, (int)Math.Ceiling(_tabs.Count / (double)TabsPerRow));
+        var clampedRow = Math.Clamp(row, 0, rowCount - 1);
+        if (clampedRow == _visibleTabRow)
+        {
+            return;
+        }
+
+        _visibleTabRow = clampedRow;
+        RefreshTabStrip();
     }
 
     private void CloseTab(BrowserTab tab)
@@ -598,21 +720,26 @@ public partial class MainWindow : Window
 
         var wasActive = tab == _activeTab;
         BrowserHost.Children.Remove(tab.Browser);
-        Tabs.Items.Remove(tab.HeaderItem);
         _tabs.RemoveAt(index);
         tab.Dispose();
+        RefreshTabStrip();
 
         if (_tabs.Count == 0)
         {
-            Close();
+            _activeTab = null;
+            _ = CreateTabAsync(BrowserSettings.NewTabPage, selectAddressBar: true);
             return;
         }
 
         if (wasActive)
         {
             var nextIndex = Math.Min(index, _tabs.Count - 1);
-            Tabs.SelectedItem = _tabs[nextIndex].HeaderItem;
             SetActiveTab(_tabs[nextIndex]);
+        }
+
+        if (TabManagerOverlay.Visibility == Visibility.Visible)
+        {
+            RenderTabManagerCards();
         }
     }
 
@@ -813,13 +940,10 @@ public partial class MainWindow : Window
             PerformancePanel.Visibility = Visibility.Collapsed;
             ExtensionsPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
-            SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
-            DownloadsButton.FontWeight = FontWeights.Normal;
         }
 
         HistoryPanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
-        HistoryButton.FontWeight = willShow ? FontWeights.SemiBold : FontWeights.Normal;
         SidePanelColumn.Width = willShow ? new GridLength(360) : new GridLength(0);
     }
 
@@ -833,14 +957,11 @@ public partial class MainWindow : Window
             PerformancePanel.Visibility = Visibility.Collapsed;
             ExtensionsPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
-            HistoryButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
-            DownloadsButton.FontWeight = FontWeights.Normal;
             PopulateSettingsControls();
         }
 
         SettingsPanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
-        SettingsButton.FontWeight = willShow ? FontWeights.SemiBold : FontWeights.Normal;
         SidePanelColumn.Width = willShow ? new GridLength(420) : new GridLength(0);
     }
 
@@ -854,9 +975,6 @@ public partial class MainWindow : Window
             PerformancePanel.Visibility = Visibility.Collapsed;
             ExtensionsPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
-            HistoryButton.FontWeight = FontWeights.Normal;
-            SettingsButton.FontWeight = FontWeights.Normal;
-            DownloadsButton.FontWeight = FontWeights.Normal;
             UpdateSiteInfoPanel();
         }
 
@@ -980,10 +1098,7 @@ public partial class MainWindow : Window
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
             ExtensionsPanel.Visibility = Visibility.Collapsed;
-            HistoryButton.FontWeight = FontWeights.Normal;
-            SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
-            DownloadsButton.FontWeight = FontWeights.Normal;
         }
 
         PerformancePanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
@@ -1000,13 +1115,10 @@ public partial class MainWindow : Window
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
             ExtensionsPanel.Visibility = Visibility.Collapsed;
-            HistoryButton.FontWeight = FontWeights.Normal;
-            SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
         }
 
         DownloadsPanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
-        DownloadsButton.FontWeight = willShow ? FontWeights.SemiBold : FontWeights.Normal;
         SidePanelColumn.Width = willShow ? new GridLength(420) : new GridLength(0);
     }
 
@@ -1020,10 +1132,7 @@ public partial class MainWindow : Window
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
-            HistoryButton.FontWeight = FontWeights.Normal;
-            SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
-            DownloadsButton.FontWeight = FontWeights.Normal;
         }
 
         ExtensionsPanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
@@ -1664,17 +1773,206 @@ public partial class MainWindow : Window
     private void NewTabButton_Click(object sender, RoutedEventArgs e) =>
         _ = CreateTabAsync(BrowserSettings.NewTabPage, selectAddressBar: true);
 
-    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void TabManagerButton_Click(object sender, RoutedEventArgs e)
     {
-        if (Tabs.SelectedItem is TabItem { Tag: BrowserTab tab } && tab != _activeTab)
+        ToggleTabManager();
+    }
+
+    private void CloseTabManagerButton_Click(object sender, RoutedEventArgs e)
+    {
+        HideTabManager();
+    }
+
+    private void ToggleTabManager()
+    {
+        if (TabManagerOverlay.Visibility == Visibility.Visible)
         {
-            SetActiveTab(tab);
+            HideTabManager();
+            return;
         }
+
+        while (CloseOpenPanel())
+        {
+        }
+
+        RenderTabManagerCards();
+        TabManagerOverlay.Visibility = Visibility.Visible;
+        TabStripBorder.Visibility = Visibility.Hidden;
+    }
+
+    private void HideTabManager()
+    {
+        TabManagerOverlay.Visibility = Visibility.Collapsed;
+        TabStripBorder.Visibility = Visibility.Visible;
+    }
+
+    private void RenderTabManagerCards()
+    {
+        TabManagerItems.Items.Clear();
+        TabManagerCount.Text = _tabs.Count == 1 ? "1 open tab" : $"{_tabs.Count} open tabs";
+
+        foreach (var tab in _tabs)
+        {
+            TabManagerItems.Items.Add(CreateTabManagerCard(tab));
+        }
+    }
+
+    private Border CreateTabManagerCard(BrowserTab tab)
+    {
+        var title = new TextBlock
+        {
+            Text = tab.Title,
+            FontWeight = FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            ToolTip = tab.Title
+        };
+        title.SetResourceReference(TextBlock.ForegroundProperty, "QuartzTextBrush");
+
+        var location = new TextBlock
+        {
+            Text = GetTabLocation(tab),
+            Margin = new Thickness(0, 5, 0, 0),
+            FontSize = 11,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            ToolTip = tab.Browser.Address
+        };
+        location.SetResourceReference(TextBlock.ForegroundProperty, "QuartzMutedTextBrush");
+
+        var favicon = new Image
+        {
+            Width = 18,
+            Height = 18,
+            Margin = new Thickness(0, 0, 9, 0),
+            Stretch = Stretch.Uniform,
+            Source = tab.FaviconImage.Source ?? DefaultTabIcon,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+
+        var closeButton = new Button
+        {
+            Content = "\u00D7",
+            Width = 26,
+            Height = 26,
+            Padding = new Thickness(0),
+            Style = (Style)FindResource("TabCloseButtonStyle"),
+            ToolTip = $"Close {tab.Title}"
+        };
+        closeButton.Click += (_, e) =>
+        {
+            e.Handled = true;
+            CloseTab(tab);
+            RenderTabManagerCards();
+        };
+
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(favicon, 0);
+        Grid.SetColumn(closeButton, 2);
+        row.Children.Add(favicon);
+        row.Children.Add(closeButton);
+        var text = new StackPanel { MinWidth = 0 };
+        text.Children.Add(title);
+        text.Children.Add(location);
+        Grid.SetColumn(text, 1);
+        row.Children.Add(text);
+
+        var previewTitle = new TextBlock
+        {
+            Text = tab.IsLoading ? "Loading…" : tab.Title,
+            Margin = new Thickness(12),
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Bottom
+            };
+        previewTitle.SetResourceReference(TextBlock.ForegroundProperty, "QuartzTextBrush");
+        var preview = new Border
+        {
+            Height = 58,
+            Margin = new Thickness(0, 0, 0, 10),
+            Padding = new Thickness(0),
+            CornerRadius = new CornerRadius(6),
+            Child = previewTitle
+        };
+        preview.SetResourceReference(Border.BackgroundProperty, "QuartzAccentSoftBrush");
+        preview.SetResourceReference(Border.BorderBrushProperty, "QuartzBorderBrush");
+        preview.BorderThickness = new Thickness(1);
+
+        var content = new StackPanel();
+        content.Children.Add(preview);
+        content.Children.Add(row);
+
+        var card = new Border
+        {
+            Width = 240,
+            Height = 156,
+            Margin = new Thickness(0, 0, 12, 12),
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(9),
+            BorderThickness = tab == _activeTab ? new Thickness(2) : new Thickness(1),
+            Cursor = Cursors.Hand,
+            Child = content,
+            ToolTip = "Switch to this tab"
+        };
+        card.SetResourceReference(Border.BackgroundProperty, tab == _activeTab ? "QuartzAccentSoftBrush" : "QuartzSurfaceBrush");
+        card.SetResourceReference(Border.BorderBrushProperty, tab == _activeTab ? "QuartzAccentBrush" : "QuartzBorderBrush");
+        card.MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                SetActiveTab(tab);
+                HideTabManager();
+                e.Handled = true;
+            }
+        };
+        return card;
+    }
+
+    private static string GetTabLocation(BrowserTab tab)
+    {
+        if (tab.IsNewTabPage)
+        {
+            return "Quartz new tab";
+        }
+
+        return Uri.TryCreate(tab.Browser.Address, UriKind.Absolute, out var uri)
+            ? uri.Host
+            : tab.Browser.Address ?? "Local page";
+    }
+
+    private void ClearAllTabsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(
+                "Close all open tabs? Quartz will leave one fresh new tab open.",
+                "Clear all tabs",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        foreach (var tab in _tabs.ToArray())
+        {
+            BrowserHost.Children.Remove(tab.Browser);
+            tab.Dispose();
+        }
+
+        _tabs.Clear();
+        _activeTab = null;
+        HideTabManager();
+        _ = CreateTabAsync(BrowserSettings.NewTabPage, selectAddressBar: true);
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && CloseOpenPanel())
+        if (e.Key == Key.Escape && TabManagerOverlay.Visibility == Visibility.Visible)
+        {
+            HideTabManager();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && CloseOpenPanel())
         {
             e.Handled = true;
         }
@@ -1692,6 +1990,11 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.T)
         {
             _ = CreateTabAsync(BrowserSettings.NewTabPage, selectAddressBar: true);
+            e.Handled = true;
+        }
+        else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.A)
+        {
+            ToggleTabManager();
             e.Handled = true;
         }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.D)

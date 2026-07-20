@@ -169,3 +169,6 @@ release/                      Generated installer metadata
 - Resource controls remain informational; Quartz does not claim to enforce CPU, memory, or network limits.
 
 See [update.md](update.md) for the release history.
+## Tab management
+
+Quartz keeps the tab strip compact as tab counts grow: it displays exactly four tabs from one row at a time. Additional groups of four are kept as internal rows and can be reached with the row arrows beside the tab manager. Quartz automatically reveals the active tab's row. Use the grid button beside **New tab** (or `Ctrl+Shift+A`) to open **All tabs**, which hides the normal strip and shows every tab as a card with a styled preview, favicon, title, location, and close action. Clearing all tabs always leaves a fresh Quartz new tab open.

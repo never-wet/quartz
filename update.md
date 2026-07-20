@@ -115,3 +115,9 @@ Release and distribution work completed for 1.1:
 - Theme changes need careful contrast testing across every panel and control.
 - Downloads should use Quartz UI only, not the default Edge-looking downloads UI.
 - Tabs need favicon fallback behavior for sites without a standard favicon.
+## Tab management update
+
+- Replaced the expanding WPF tab strip with a fixed-height, four-tab row layout.
+- Added previous/next row controls; additional tab rows remain internal until selected, and the active row is revealed automatically.
+- Added the Quartz **All tabs** manager with styled fallback previews, close controls, active-tab highlighting, and confirmed clear-all behavior.
+- Added `Ctrl+Shift+A` to open or close the tab manager; `Escape` closes it.
