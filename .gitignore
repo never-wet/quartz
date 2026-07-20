@@ -7,3 +7,4 @@ TestResults/
 .tools/
 artifacts/
 installer/dependencies/
+release/*.exe

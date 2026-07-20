@@ -1,11 +1,11 @@
 using System.Windows.Controls;
-using Microsoft.Web.WebView2.Wpf;
+using CefSharp.Wpf;
 
 namespace Quartz;
 
-internal sealed class BrowserTab(WebView2 browser) : IDisposable
+internal sealed class BrowserTab(ChromiumWebBrowser browser) : IDisposable
 {
-    public WebView2 Browser { get; } = browser;
+    public ChromiumWebBrowser Browser { get; } = browser;
 
     public TabItem HeaderItem { get; set; } = null!;
 
@@ -24,6 +24,10 @@ internal sealed class BrowserTab(WebView2 browser) : IDisposable
     public bool IsNewTabPage { get; set; }
 
     public bool IsRenderingNewTabPage { get; set; }
+
+    public bool LastLoadFailed { get; set; }
+
+    public string? FaviconUrl { get; set; }
 
     public bool IsClosed { get; private set; }
 

@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repoRoot 'src\Quartz\Quartz.csproj'
 $publishPath = Join-Path $repoRoot "artifacts\publish\$Runtime"
-$dependencyPath = Join-Path $PSScriptRoot 'dependencies\MicrosoftEdgeWebview2Setup.exe'
+$vcRuntimePath = Join-Path $PSScriptRoot 'dependencies\VC_redist.x64.exe'
 $releasePath = Join-Path $repoRoot 'release'
 $localDotnet = 'C:\Users\junha\.cache\quartz-dotnet\dotnet.exe'
 $dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
@@ -21,7 +21,7 @@ if (-not $dotnet) {
     throw 'The .NET 8 SDK was not found. Install it or add dotnet to PATH.'
 }
 
-New-Item -ItemType Directory -Force -Path $publishPath, (Split-Path $dependencyPath), $releasePath | Out-Null
+New-Item -ItemType Directory -Force -Path $publishPath, (Split-Path $vcRuntimePath), $releasePath | Out-Null
 
 & $dotnet publish $projectPath `
     --configuration $Configuration `
@@ -36,9 +36,14 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Quartz publish failed.'
 }
 
-if (-not (Test-Path $dependencyPath)) {
-    Write-Host 'Downloading the official Microsoft WebView2 Evergreen bootstrapper...'
-    Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $dependencyPath
+if (-not (Test-Path $vcRuntimePath)) {
+    Write-Host 'Downloading the official Microsoft Visual C++ 2015-2022 x64 Redistributable...'
+    Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vcRuntimePath
+}
+
+$vcSignature = Get-AuthenticodeSignature $vcRuntimePath
+if ($vcSignature.Status -ne 'Valid' -or $vcSignature.SignerCertificate.Subject -notlike '*Microsoft*') {
+    throw "The Visual C++ Redistributable signature is not valid: $($vcSignature.Status)"
 }
 
 $isccCandidates = @(
@@ -83,7 +88,7 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Quartz installer compilation failed.'
 }
 
-$installerPath = Join-Path $releasePath 'QuartzSetup.exe'
+$installerPath = Join-Path $releasePath 'Quartz-2.0.0-Setup.exe'
 $installer = Get-Item $installerPath
 $sizeMb = [Math]::Round($installer.Length / 1MB, 1)
 Write-Host "Created $installerPath ($sizeMb MB)"

@@ -1,11 +1,13 @@
-# Quartz 1.1 Windows release
+# Quartz 2.0 Windows release
 
-- Installer: `QuartzSetup.exe`
-- Release date: July 19, 2026
+- Installer: `Quartz-2.0.0-Setup.exe`
+- Release date: July 20, 2026
 - Supported system: 64-bit Windows 10 or Windows 11
-- Installer size: 52,115,728 bytes (49.7 MB)
-- SHA-256: `D7D4D5E9F10B33FA7A12BE233960F60B2B3689A86BFBF54A3EB7FDFF11150DF0`
+- Installer size: 196,518,866 bytes (187.4 MiB)
+- SHA-256: `26A0A8BE82A055A2A95801CC80BDF6208657B3D71C69C3A0BBF6AA0A2A793702`
 
-This installer contains a self-contained .NET 8 publish of Quartz and Microsoft's WebView2 Evergreen bootstrapper. It is currently unsigned; production distribution should use a trusted Windows code-signing certificate.
+This installer contains a self-contained .NET 8 publish, CefSharp/Chromium runtime binaries, CEF resources and locales, and Microsoft's signed Visual C++ 2015-2022 x64 prerequisite. It does not install or use WebView2.
 
-Release highlights are maintained in [`../update.md`](../update.md).
+The installer and application are currently unsigned. Public production distribution should use a trusted Windows code-signing certificate.
+
+Release highlights and extension limitations are maintained in [`../update.md`](../update.md) and [`../README.md`](../README.md).

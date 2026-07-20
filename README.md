@@ -1,283 +1,171 @@
-# Quartz
+# Quartz Browser 2.0
 
-Quartz is a small Windows web browser prototype. It uses C#, .NET 8, WPF, and Microsoft Edge WebView2 (Chromium).
+Quartz is a Windows desktop browser built with C#, .NET 8, WPF, CefSharp, and Chromium Embedded Framework (CEF). Version 2.0 replaces Microsoft WebView2 with a packaged Chromium engine and adds experimental support for local unpacked Chromium extensions.
 
-## Version 1.1 features and fixes
+## Features
 
-- One browser window with multiple tabs
-- New tab button
-- Close tab button
-- `Ctrl+T` to open a tab
-- `Ctrl+W` to close the active tab
-- Address bar with URL handling and selectable DuckDuckGo, Google, or Bing search
-- Back, forward, reload, and home controls
-- Configurable homepage used by Home and homepage startup
-- Configurable startup behavior: homepage or the Quartz new-tab page
-- Page URL and title synchronization
-- Navigation-aware back and forward buttons
-- Loading and status indicators
-- Simple startup and navigation error messages
-- Links that request a new window open in a new tab instead
-- JSON-backed bookmarks that remain after restarting Quartz
-- Bookmark star button and `Ctrl+D` toggle
-- Bookmarks bar with open and remove controls
-- Duplicate bookmark prevention by exact URL
-- Active bookmark state that follows navigation and tab selection
-- Persistent JSON browsing history with page title, URL, and visit time
-- Newest-first History panel with clickable entries
-- History toolbar button and `Ctrl+H` toggle
-- Clear-all history action with confirmation
-- Successful HTTP/HTTPS visits only, capped at the latest 500 entries
-- Consecutive duplicate URL suppression
-- Packaged Quartz executable/window/taskbar icon
-- Native WebView2 favicons in compact tab headers, with an origin `/favicon.ico` fallback
-- WebView2 download detection with live progress and status
-- Default saving to the user's Downloads folder with collision-safe names
-- Completed-only JSON download history that survives restarts
-- Clear completed download history without affecting active, canceled, or failed items
-- Downloads run through WebView2 and save directly to the user's Downloads folder; the toolbar button and `Ctrl+J` toggle an integrated Quartz panel
-- JSON-backed Settings panel with toolbar and `Ctrl+,` access
-- Confirmed controls to clear history, downloads history, bookmarks, or all three
-- Private browsing windows with isolated temporary WebView2 profiles
-- `Ctrl+Shift+N` and the Private toolbar button open a private window
-- Private windows do not write to normal history or downloads history
-- Address-bar security indicator for HTTPS, HTTP, and local/internal pages
-- Site information panel with connection details and per-site data clearing
-- Quartz permission prompts for camera, microphone, location, and notifications
-- Certificate errors are canceled and shown as clear Quartz security warnings
-- Settings privacy/security shortcuts for site data and private windows
-- Shared Quartz design system with a neutral canvas, white surfaces, and a violet accent
-- Rounded active tabs, quieter inactive tabs, and trimmed long tab titles
-- Compact icon toolbar with consistent sizing, hover/pressed states, disabled states, and tooltips
-- Polished address bar, bookmarks bar, security state, loading indicator, and status area
-- Consistent Quartz cards, headers, spacing, and actions across History, Settings, site information, permissions, and Downloads
-- Compact 80-pixel tab/toolbar chrome by default, a hidden collapsible bookmarks row, and scrolling side panels for windows from 800x600 upward
-- A subtle private-mode badge and private color treatment that remains distinct without obscuring browsing
-- `Escape` closes the open History, Settings, or site-information panel
-- Four built-in Quartz theme presets: Light, Dark, Midnight, and Neon
-- Five accent presets that update progress, active-tab, selection, and primary-action colors
-- Immediate theme/accent preview with JSON persistence across restarts
-- Optional compact Quartz sidebar with routes to bookmarks, History, Downloads, Settings, and Performance info
-- A local Quartz new-tab page with branded styling, address/search input, and bookmark-backed quick links
-- New-tab styling follows the selected theme and accent without loading an external website
-- Honest Performance info panel explaining WebView2/Windows resource management without simulated limiter controls
-- Dynamic semantic brushes for field text, warnings, secure states, errors, tooltips, selections, and accent contrast across every theme
-- No assistant, chat, or automated browsing feature is included
+- Independent multi-tab browsing with favicons and per-tab navigation history
+- Address bar URL normalization and DuckDuckGo, Google, or Bing search
+- Back, forward, reload, home, page-title, loading, and security state updates
+- Local bookmarks, visited-page history, completed-download history, and settings
+- CEF download handling with live progress, cancellation, open-file, and open-folder actions
+- Quartz new-tab page, theme presets, accent presets, sidebar, and responsive panels
+- Custom permission prompts and certificate-error blocking
+- Isolated in-memory private browser profiles; private visits and downloads are not added to normal history
+- Experimental unpacked Chromium extension manager
 
-## Prerequisites
+Quartz does not include an Agent, AI assistant, Copilot, or chat feature.
 
-1. Windows 10 or Windows 11.
-2. [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
-3. Microsoft Edge WebView2 Runtime. It is included with current Windows and Microsoft Edge installations. If needed, install the Evergreen Runtime from the [official WebView2 download page](https://developer.microsoft.com/microsoft-edge/webview2/).
+## Why CefSharp
 
-Visual Studio 2022 with the **.NET desktop development** workload can be used instead of the command line.
+Quartz 2.0 uses `CefSharp.Wpf.NETCore` 150.0.110.
+
+| Option | Result |
+|---|---|
+| CefSharp WPF | Selected. It has a native WPF control, current Chromium/CEF releases, established C# handlers for downloads/permissions/popups, and NuGet packaging for x64 Windows. |
+| CefNet WPF | Not selected. Its latest public WPF package is from 2022 and tracks a much older Chromium branch. |
+| Custom CEF or Chromium fork | Maximum control, but far more build, security-update, and packaging work than this project can reasonably maintain. |
+
+The official [CefSharp repository](https://github.com/cefsharp/CefSharp) documents its WPF control and current release model. The selected [CefSharp.Wpf.NETCore package](https://www.nuget.org/packages/CefSharp.Wpf.NETCore/150.0.110) supports .NET 8 through framework compatibility.
+
+## Requirements
+
+- 64-bit Windows 10 or Windows 11
+- For source builds: .NET 8 SDK
+- Visual C++ 2015-2022 x64 runtime (the installer checks and installs Microsoft's signed redistributable when missing)
+
+WebView2 is not required. The Release publish and installer include CEF, Chromium resources, locales, and the .NET runtime.
 
 ## Build and run
 
-From the repository root:
+From PowerShell in the repository root:
 
 ```powershell
-dotnet restore Quartz.sln
-dotnet build Quartz.sln --configuration Release
+dotnet restore .\Quartz.sln
+dotnet build .\Quartz.sln -c Debug
 dotnet run --project .\src\Quartz\Quartz.csproj
 ```
 
-In Visual Studio, open `Quartz.sln`, set `Quartz` as the startup project, and press `F5`.
-
-## Publish and build the Windows installer
-
-Quartz ships as a self-contained 64-bit Windows application, so end users do not need to install .NET separately. From the repository root:
+Release build:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
+dotnet build .\Quartz.sln -c Release
+dotnet run --project .\src\Quartz\Quartz.csproj -c Release
 ```
 
-The packaging script performs these steps:
+If `dotnet` is not on `PATH`, use the full path to a .NET 8 SDK executable.
 
-1. Publishes Quartz self-contained for `win-x64` to `artifacts\publish\win-x64`.
-2. Downloads Microsoft's official WebView2 Evergreen bootstrapper when it is not already cached.
-3. Uses Inno Setup 7, preparing a local compiler under `.tools\InnoSetup` when necessary.
-4. Produces the public installer at `release\QuartzSetup.exe`.
+## Unpacked extensions
 
-The installer uses a branded dark Quartz wizard, installs per-user to `%LOCALAPPDATA%\Programs\Quartz`, creates a Start Menu shortcut, offers an optional Desktop shortcut and launch action, and registers a normal Windows uninstall entry. WebView2 is installed silently only if the Evergreen Runtime is missing.
+1. Turn on the Quartz sidebar in Settings if it is hidden.
+2. Select **Extensions** (hexagon icon).
+3. Select **Load unpacked**.
+4. Choose a local folder containing a valid Manifest V3 `manifest.json`.
+5. Restart Quartz. Enabled extension folders are passed to Chromium with `--load-extension` at process startup.
 
-Before publishing Quartz broadly, sign both the application executable and `QuartzSetup.exe` with a trusted Windows code-signing certificate. The locally generated installer is intentionally unsigned.
+Extension records are stored in `%LOCALAPPDATA%\Quartz\extensions.json`. Disabling or removing an extension is saved immediately and takes effect after Quartz restarts. Removing an extension record does not delete its source folder.
 
-## Preview and deploy the download homepage
+### Extension limitations
 
-The responsive static product site is in `website/` and has no build-time dependencies. After building the installer, preview it from the repository root:
+- Chrome Web Store installation is not implemented.
+- CEF 128 and later removed the older dynamic request-context extension API, so Quartz applies extension changes at startup.
+- CEF officially supports extensions with Chrome-style windows that expose Chrome UI. Quartz uses CefSharp's WPF off-screen/custom-window control so extensions that do not depend on Chrome toolbar buttons or Chrome-owned UI may work, while others may fail.
+- Some Chrome extension APIs, service integration, signing, update, toolbar popup, and Web Store behavior are unavailable or unverified.
+- Compatibility must be tested extension by extension. Quartz does not claim full Google Chrome compatibility.
 
-```powershell
-python -m http.server 8080
-```
+These constraints follow CEF's own guidance: [`--load-extension` can run unpacked extensions, but off-screen/Alloy-style windows only support non-Chrome-UI-dependent extensions case by case](https://www.magpcss.org/ceforum/viewtopic.php?p=56233).
 
-Open `http://localhost:8080/website/`. Its download buttons point to `../release/QuartzSetup.exe`, which works with this repository layout. For independent hosting, replace the three installer links in `website/index.html` with the final hosted release URL. Update the version, file size, release date, and changelog copy on each public release.
+## Browser data
 
-For an installer smoke test, run `release\QuartzSetup.exe`, select the optional Desktop shortcut, complete setup, launch Quartz, confirm both shortcuts work, and uninstall **Quartz Browser** from Windows Settings > Apps > Installed apps.
+Normal profile data:
 
-## Using Quartz
+- CEF profile: `%LOCALAPPDATA%\Quartz\Chromium`
+- Bookmarks: `%LOCALAPPDATA%\Quartz\bookmarks.json`
+- History: `%LOCALAPPDATA%\Quartz\history.json`
+- Downloads history: `%LOCALAPPDATA%\Quartz\downloads.json`
+- Settings: `%LOCALAPPDATA%\Quartz\settings.json`
+- Extensions: `%LOCALAPPDATA%\Quartz\extensions.json`
 
-- Enter a full URL such as `https://github.com` and press Enter.
-- Enter a domain such as `youtube.com` and press Enter; Quartz adds HTTPS.
-- Enter words such as `WPF WebView2` and press Enter; Quartz uses the selected search engine.
-- Press `Ctrl+L` to focus the address bar or `Ctrl+R` to reload.
-- Press `Ctrl+T` to open a new tab.
-- Press `Ctrl+W` to close the active tab.
-- Press `Ctrl+D` to bookmark or unbookmark the active page.
-- Press `Ctrl+H` to open or close the History panel.
-- Press `Ctrl+,` to open or close Settings.
-- Press `Ctrl+Shift+N` or click **Private** to open a private window.
-- Press `Ctrl+J` to open or close the integrated Downloads panel.
-- Press `Alt+Left` and `Alt+Right` to move through page history.
-- Click a bookmark title to open it in the active tab, or its remove button to delete it.
-- Click a History entry to open it in the active tab, or use **Clear all** to remove every stored visit.
-- Use the integrated Downloads panel to monitor progress, cancel active transfers, open completed files, open their folder, or clear completed records.
-- Use Settings to change the homepage, search engine, startup page, or clear stored browsing data.
-- Use Settings > **Appearance** to switch theme and accent presets or show/hide the sidebar.
-- Click the sidebar toggle at the start of the toolbar to collapse or restore the sidebar.
-- Enter a URL or search in the Quartz new-tab page, or use one of its bookmark/static quick links.
-- Use the sidebar star to show or hide the bookmarks bar.
-- Open **Performance info** from the bottom sidebar button for an honest explanation of resource-management limitations.
+Downloads save to the user's `Downloads` folder. Private windows use an isolated in-memory CEF request context plus a temporary Quartz record folder. Private visits and completed-download records are discarded when that window closes; downloaded files remain on disk. Bookmarks created from a private window intentionally use the normal bookmark store.
 
-Bookmarks are stored locally at `%LOCALAPPDATA%\Quartz\bookmarks.json`. If that file is missing or contains invalid JSON, Quartz starts with an empty bookmarks bar.
+The security indicator reflects the active page scheme. CEF performs certificate validation; Quartz rejects certificate errors without an unsafe bypass. Site-data controls remove CEF cookies/cache and page-accessible storage on a best-effort basis. CEF or Chromium may retain storage not exposed through these APIs until the profile is removed.
 
-Browsing history is stored at `%LOCALAPPDATA%\Quartz\history.json`. Missing or invalid history files are treated as empty, and Quartz retains at most the newest 500 valid entries.
+## Keyboard shortcuts
 
-Downloads are saved to `%USERPROFILE%\Downloads` by default. Completed-download history is stored at `%LOCALAPPDATA%\Quartz\downloads.json` and retains the newest 200 completed items. Canceled, interrupted, and failed transfers are tracked internally but are not saved as completed history.
-
-Quartz first requests each tab icon through WebView2's favicon API. If the runtime does not return a usable image, Quartz requests `/favicon.ico` from the current site's origin. Pages without either source retain the packaged Quartz icon.
-
-Browser preferences are stored at `%LOCALAPPDATA%\Quartz\settings.json`. This includes homepage, search engine, startup behavior, theme, accent, and sidebar visibility. Missing, invalid, or corrupted settings files safely fall back to the DuckDuckGo homepage/search engine, Light theme, Quartz violet accent, visible sidebar, and homepage startup behavior.
-
-Quartz's new-tab page is generated locally with `CoreWebView2.NavigateToString`; it does not request a hosted Quartz page. The page sends only the submitted address/search text to the owning tab through WebView2's web-message bridge. Bookmark URLs are HTML-encoded before being displayed as quick links.
-
-Private windows use a temporary WebView2 user-data directory and a temporary history/downloads record store. The temporary profile is deleted when the private window closes; downloaded files themselves remain in the normal Downloads folder. Private bookmarks intentionally use the normal bookmark store. WebView2 profile cleanup is best-effort if the runtime still has a file lock during shutdown.
-
-The security indicator reports the active URL's connection scheme after WebView2 navigation: HTTPS is shown as secure, HTTP as not secure, and non-web pages as local/internal. WebView2 performs the actual certificate validation; Quartz cancels certificate-error events and does not provide an unsafe bypass. The per-site clear button removes cookies through WebView2 and clears storage exposed to the currently loaded origin. Browser-managed or partitioned storage that is not exposed to the page may require the profile-wide **Clear cookies and site data** Settings action. Permission choices apply to the current request and are not permanently saved. WebView2 exposes notification permission requests, but push notifications remain limited by the runtime.
+| Shortcut | Action |
+|---|---|
+| `Ctrl+T` | New tab |
+| `Ctrl+W` | Close active tab |
+| `Ctrl+L` | Focus address bar |
+| `Ctrl+R` | Reload |
+| `Ctrl+D` | Bookmark/unbookmark |
+| `Ctrl+H` | History |
+| `Ctrl+J` | Downloads |
+| `Ctrl+,` | Settings |
+| `Ctrl+Shift+N` | New private window |
+| `Alt+Left` / `Alt+Right` | Back / forward |
+| `Escape` | Close the open side panel |
 
 ## Verification checklist
 
-Use this Version 1.1 regression test:
+1. Build Debug and Release with zero errors.
+2. Launch Quartz and confirm the local Quartz new-tab page appears.
+3. Load `https://www.google.com`, `https://www.youtube.com`, and `https://github.com`.
+4. Open multiple tabs and verify address, title, favicon, loading, back/forward, reload, and home state stays tab-specific.
+5. Bookmark a page, visit pages, restart, and verify normal bookmark/history persistence.
+6. Start a download and verify progress, cancellation, completion, file/folder actions, and completed-history persistence.
+7. Open a private window and confirm its visits/download records do not enter normal history.
+8. Test each theme and the Settings, History, Downloads, Site info, Performance, and Extensions panels at 800x600 and larger sizes.
+9. Load a simple unpacked Manifest V3 content-script extension, restart Quartz, and verify its page behavior. Do not use a toolbar-dependent extension as the baseline test.
 
-1. Launch Quartz and confirm its diamond icon appears in the title bar and taskbar.
-2. Visit Google and GitHub in separate tabs. Confirm each tab shows its site favicon, the active tab is distinct, and long titles trim cleanly.
-3. Confirm the bookmarks bar is hidden initially, toggle it with the sidebar star, and verify the webpage starts immediately below the compact tab/toolbar chrome when hidden.
-4. Select Light, Dark, Midnight, and Neon in Settings. Check toolbar, tabs, address field, ComboBox lists, History, Downloads, Settings, site information, Performance info, and permission prompts for readable text.
-5. Open Downloads from the toolbar and with `Ctrl+J`; confirm both toggle the integrated panel without opening another window.
-6. Download a file and verify live progress/status, source URL, save path, cancel, open-file, open-folder, failed/canceled status, persistence, and Clear completed.
-7. Open **Performance info** and confirm it contains no functional-looking CPU, memory, or network limiter controls.
-8. Recheck bookmarks, History, Settings, private mode, permission prompts, and security status.
+## Installer and release
 
-Use this Step 10 identity-feature smoke test:
+Build the self-contained `win-x64` installer:
 
-1. Open Settings > **Appearance** and select Light, Dark, Midnight, and Neon. Confirm each updates the window, toolbar, tabs, address bar, panels, progress color, and new-tab page immediately.
-2. Choose each accent preset and confirm the active-tab indicator, focused address border, important buttons, progress UI, and selected states use the new accent.
-3. Restart Quartz and confirm the selected theme, accent, and sidebar visibility persist.
-4. Collapse and restore the sidebar with the toolbar menu button. Use its Bookmarks, History, Downloads, and Settings buttons and confirm they route to the existing Quartz views without closing the browser.
-5. Open a new tab. Confirm the local Quartz identity page appears, bookmark/static quick links work, and entering both a domain and a search phrase navigates the active tab.
-6. Open **Performance info** from the sidebar. Confirm it explains that Windows and WebView2 manage resources and presents no simulated limiter controls.
-7. Open a private window and confirm themes, the sidebar, and the new-tab page work while private history/download isolation remains unchanged.
-8. Recheck normal tabs, navigation, bookmarks, History, Downloads, Settings, site information, permissions, and all existing keyboard shortcuts.
+```powershell
+.\installer\build-installer.ps1
+```
 
-Use this Step 9 UI-polish smoke test:
+The script:
 
-1. Run Quartz at 800x600, 1366x768, and 1920x1080. Confirm the toolbar remains aligned, the address bar stays usable, and no panel extends beyond the window.
-2. Open several tabs with long titles. Confirm the active tab is obvious, inactive tabs remain readable, and long titles trim with an ellipsis.
-3. Hover and press the navigation, bookmark, History, Downloads, Settings, and Private buttons; confirm their states are consistent and tooltips identify each command.
-4. Open a new tab with `Ctrl+T` and confirm focus moves to the address bar. Close it with `Ctrl+W` and confirm Quartz selects a nearby tab.
-5. Open History, Settings, and the site-information panel. Confirm the shared card styling and scrolling behavior, and use `Escape` to close each panel.
-6. Open Downloads and a permission request. Confirm both use the same Quartz typography, accent color, borders, and button language as the main window.
-7. Open a private window and confirm the private badge and subtle color treatment are visible without changing the overall layout.
-8. Recheck navigation, searches, bookmarks, History, Downloads, Settings, security status, permission prompts, and private browsing.
+1. Publishes Quartz with .NET and all CEF runtime files.
+2. Downloads and signature-checks Microsoft's Visual C++ 2015-2022 x64 redistributable when needed for packaging.
+3. Uses Inno Setup to create `release\Quartz-2.0.0-Setup.exe`.
 
-Use this Step 8 security/privacy smoke test:
+The installed application is per-user under `%LOCALAPPDATA%\Programs\Quartz`. It creates a Start Menu entry, optionally creates a Desktop shortcut, registers uninstall information, and includes CEF binaries/resources/locales. Because Chromium is bundled, Quartz 2.0 is hundreds of megabytes unpacked and the installer is much larger than Quartz 1.x.
 
-1. Open `about:blank`, an HTTPS page, and an HTTP page; confirm the indicator shows **Local**, **Secure**, and **Not secure** respectively.
-2. Switch between those tabs and confirm the indicator follows the active tab.
-3. Click the indicator and verify the site domain, full URL, connection status, privacy note, and clear-site-data control.
-4. Trigger camera, microphone, location, and notification requests from a test site. Confirm Quartz shows its own Allow/Block prompt and closing the prompt blocks the request.
-5. Visit a site with an invalid certificate and confirm Quartz cancels it and shows a security warning without a bypass action.
-6. Open Settings and test **Clear cookies and site data** and **Open a private window**.
-7. Recheck normal/private tabs, navigation, bookmarks, History, Downloads, and searches.
-
-Use this Step 7 private-mode smoke test:
-
-1. Click **New Private Window** and press `Ctrl+Shift+N`; confirm each opens a window whose title and toolbar identify Private Mode.
-2. Visit a page in a normal window and another page in a private window. Confirm only the normal visit appears in normal History.
-3. Open Downloads from a private window and confirm it is labeled **Private Downloads**.
-4. Complete a private download. Confirm the file remains in the Downloads folder but its record does not appear in the normal Downloads panel after the private window closes.
-5. Create a bookmark privately and confirm it appears normally; Quartz intentionally shares bookmarks with private windows.
-6. Close the private window and confirm its temporary `Quartz-Private-*` WebView2 profile is removed without changing normal history, bookmarks, downloads, or settings.
-7. Confirm normal browsing, tabs, navigation, search, and downloads still work.
-
-Use this Step 6 settings smoke test:
-
-1. Open Settings from the toolbar and with `Ctrl+,`.
-2. Enter a homepage domain such as `github.com`, save, and confirm Quartz normalizes it to `https://github.com/`.
-3. Click **Home** and open a new tab; confirm both use the saved homepage.
-4. Select Google, save, enter a search phrase in the address bar, and confirm the search uses Google. Repeat with Bing or DuckDuckGo.
-5. Choose **Open Quartz new tab**, save, restart Quartz, and confirm the local Quartz new-tab page opens.
-6. Restart again and confirm the homepage, search engine, and startup choice persist.
-7. Create test history, a bookmark, and a completed download record. Use each individual clear button and confirm the visible UI updates after confirmation.
-8. Recreate test data, use **Clear all browsing data**, and confirm history, completed-download history, and bookmarks are cleared together.
-9. Replace `settings.json` with invalid JSON and confirm Quartz starts safely with default settings.
-10. Recheck tabs, bookmarks, History, Downloads, and existing keyboard shortcuts.
-
-For download regression testing:
-
-1. Click a link that downloads a moderately sized file. Confirm it is saved to the user's Downloads folder.
-2. Confirm Quartz shows a download status in the browser status bar while the transfer starts and completes.
-3. Confirm the completed file can be opened from Windows File Explorer.
-4. Download the same filename twice and confirm Quartz chooses a non-conflicting save name.
-5. Close and restart Quartz, then confirm the completed-download history remains available to Settings' clear-data controls.
-6. Use Settings > **Clear downloads history** and confirm the stored completed-download records are removed without deleting downloaded files.
-7. Recheck tabs, bookmarks, History, and `Ctrl+T`, `Ctrl+W`, `Ctrl+D`, `Ctrl+H`, `Ctrl+L`, `Ctrl+R`, `Alt+Left`, and `Alt+Right`.
-
-The primary page checks are:
-
-- `https://www.google.com`
-- `https://www.youtube.com`
-- `https://github.com`
-
-Also confirm that Back and Forward enable only when available, the loading indicator follows the active tab, and closing the final tab closes Quartz.
+Before public distribution, sign both `Quartz.exe` and `QuartzSetup.exe` with a trusted Windows code-signing certificate.
 
 ## Project structure
 
 ```text
-Quartz.sln
-website/
-  index.html                 Responsive Quartz download homepage
-  styles.css                 Quartz product-site design system and breakpoints
-  app.js                     Local anchor navigation
-installer/
-  Quartz.iss                 Branded Inno Setup installer definition
-  build-installer.ps1        Self-contained publish and installer build script
-  assets/                    Quartz installer wizard artwork
-release/
-  QuartzSetup.exe            Public Windows installer artifact
 src/Quartz/
-  App.xaml                  Shared Quartz palette and reusable control styles
-  Assets/Quartz.ico        Packaged window, taskbar, executable, and fallback tab icon
-  BrowserTab.cs             Per-tab WebView2 instance and browser state
-  BrowserSettings.cs        Homepage and search settings
-  MainWindow.xaml           Browser window layout
-  MainWindow.xaml.cs        WebView2 event and command handling
+  App.xaml.cs                 CEF process initialization and profile setup
+  BrowserTab.cs               Per-tab CefSharp browser state
+  MainWindow.xaml             Quartz browser chrome and panels
+  MainWindow.xaml.cs          Navigation, tabs, commands, and panel behavior
   Models/
-    Bookmark.cs             Stored bookmark data
-    DownloadItem.cs         Live download state and progress
-    DownloadRecord.cs       Persisted completed-download data
-    HistoryEntry.cs         Stored page title, URL, and visit time
-    BrowserPreferences.cs   Homepage, search engine, and startup preferences
+    BrowserExtension.cs       Persisted unpacked extension model
+    DownloadItem.cs           Engine-neutral download view model
   Services/
-    AddressInterpreter.cs   URL and search-query interpretation
-    BookmarkService.cs      Safe JSON loading, saving, and de-duplication
-    DownloadService.cs      WebView2 download tracking and completed history
-    HistoryService.cs       Capped, newest-first JSON history persistence
-    SettingsService.cs      Safe JSON loading and saving for browser preferences
-    ThemeManager.cs         Built-in palettes, accents, and live WPF resource updates
-    NewTabPageBuilder.cs    Theme-aware local new-tab HTML and quick-link generation
-  PermissionPromptWindow.xaml     Quartz site-permission dialog
-  PermissionPromptWindow.xaml.cs  Allow/block permission decision handling
+    CefDownloadHandler.cs     CEF download callbacks
+    CefLifeSpanHandler.cs     New-window-to-tab routing
+    CefPermissionHandler.cs   Custom permission prompts
+    CefRequestHandler.cs      Certificate blocking
+    CefDisplayHandler.cs      Favicon URL callbacks
+    ExtensionService.cs       Unpacked extension validation/persistence
+    DownloadService.cs        Download progress and completed history
+installer/                    Inno Setup definition and build script
+website/                      Static public download homepage
+release/                      Generated installer metadata
 ```
 
-Version 0.10.1 intentionally does not include a custom color picker, real memory/CPU/network limiting, a full certificate interstitial, unsafe certificate bypass, per-site permission management, session restore, pause/resume, download retries, history search or grouping, bookmark folders or editing, bookmark import/export, accounts, sync, extensions, or advanced security controls. The Performance info panel is informational and never claims to enforce resource limits.
+## Major 2.0 limitations
+
+- The CEF/Chromium application is substantially larger than WebView2 because Quartz ships its own browser engine.
+- Direct Chrome Web Store installation is not supported.
+- Extension APIs are incomplete in Quartz's custom WPF window; toolbar-dependent extensions are especially limited.
+- Quartz must regularly update CefSharp/CEF to receive Chromium security fixes.
+- Resource controls remain informational; Quartz does not claim to enforce CPU, memory, or network limits.
+
+See [update.md](update.md) for the release history.

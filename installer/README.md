@@ -1,6 +1,6 @@
 # Quartz Windows installer
 
-Quartz uses Inno Setup to create one branded, per-user Windows installer. The application publish is self-contained, so users do not need to install .NET 8 separately. The Microsoft WebView2 Evergreen bootstrapper is included and runs silently only when WebView2 is missing.
+Quartz uses Inno Setup to create one branded, per-user Windows installer. The application publish is self-contained: it includes .NET 8 and the CefSharp/Chromium runtime files, so users do not need a separate WebView2 or .NET installation.
 
 ## Build
 
@@ -13,7 +13,7 @@ From the repository root:
 The script publishes Quartz for `win-x64`, downloads verified packaging dependencies when necessary, and creates:
 
 ```text
-release\QuartzSetup.exe
+release\Quartz-2.0.0-Setup.exe
 ```
 
 Inno Setup is prepared under `.tools\InnoSetup` when no compatible compiler is installed. Pass `-SkipToolBootstrap` to require an existing Inno Setup installation.
@@ -25,6 +25,9 @@ Inno Setup is prepared under `.tools\InnoSetup` when no compatible compiler is i
 - Offers an optional Desktop shortcut.
 - Registers Quartz in Windows Installed Apps for uninstall.
 - Offers to launch Quartz on the completion page.
-- Installs WebView2 Evergreen only when its runtime directory is not present.
+- Installs all CEF binaries, resources, and locales from the self-contained publish.
+- Installs Microsoft's signed Visual C++ 2015-2022 x64 Redistributable only when it is missing; Windows may request elevation for that prerequisite.
+
+The Chromium/CEF payload makes Quartz 2.0 substantially larger than the previous WebView2-based release.
 
 Before publishing publicly, code-sign `QuartzSetup.exe` and the Quartz application executable with a trusted Windows code-signing certificate.

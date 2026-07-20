@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
-using Microsoft.Web.WebView2.Core;
 using Quartz.Models;
 
 namespace Quartz.Services;
@@ -21,6 +20,7 @@ internal sealed class DownloadService
 
     private readonly string _historyFilePath;
     private readonly string _downloadsFolder;
+    private readonly Dictionary<int, DownloadItem> _activeDownloads = [];
 
     private DownloadService(string historyFilePath, string downloadsFolder)
     {
@@ -88,46 +88,67 @@ internal sealed class DownloadService
         return candidate;
     }
 
-    public DownloadItem Track(CoreWebView2DownloadOperation operation, string savePath)
+    public DownloadItem Track(
+        int engineId,
+        string sourceUrl,
+        string savePath,
+        long bytesReceived,
+        long totalBytes,
+        Action cancel)
     {
-        var item = DownloadItem.CreateActive(operation, savePath);
-        Downloads.Insert(0, item);
-
-        void UpdateProgress(object? sender, object args) =>
-            item.UpdateProgress(operation.BytesReceived, operation.TotalBytesToReceive);
-
-        void UpdateState(object? sender, object args)
+        if (_activeDownloads.TryGetValue(engineId, out var existing))
         {
-            item.UpdateProgress(operation.BytesReceived, operation.TotalBytesToReceive);
-
-            switch (operation.State)
-            {
-                case CoreWebView2DownloadState.InProgress:
-                    return;
-                case CoreWebView2DownloadState.Completed:
-                    item.MarkCompleted(DateTimeOffset.Now);
-                    SaveCompletedHistory();
-                    break;
-                case CoreWebView2DownloadState.Interrupted:
-                    item.MarkInterrupted(operation.InterruptReason);
-                    break;
-            }
-
-            operation.BytesReceivedChanged -= UpdateProgress;
-            operation.StateChanged -= UpdateState;
+            return existing;
         }
 
-        operation.BytesReceivedChanged += UpdateProgress;
-        operation.StateChanged += UpdateState;
-        item.UpdateProgress(operation.BytesReceived, operation.TotalBytesToReceive);
+        var item = DownloadItem.CreateActive(
+            engineId,
+            sourceUrl,
+            savePath,
+            bytesReceived,
+            totalBytes,
+            cancel);
+        Downloads.Insert(0, item);
+        _activeDownloads[engineId] = item;
         return item;
+    }
+
+    public void Update(
+        int engineId,
+        long bytesReceived,
+        long totalBytes,
+        bool isComplete,
+        bool isCanceled,
+        bool isInProgress)
+    {
+        if (!_activeDownloads.TryGetValue(engineId, out var item))
+        {
+            return;
+        }
+
+        item.UpdateProgress(bytesReceived, totalBytes > 0 ? (ulong)totalBytes : null);
+        if (isInProgress)
+        {
+            return;
+        }
+
+        _activeDownloads.Remove(engineId);
+        if (isComplete)
+        {
+            item.MarkCompleted(DateTimeOffset.Now);
+            SaveCompletedHistory();
+        }
+        else
+        {
+            item.MarkInterrupted(isCanceled, isCanceled ? null : "Chromium interrupted the transfer");
+        }
     }
 
     public void Cancel(DownloadItem item)
     {
         if (item.IsActive)
         {
-            item.Operation?.Cancel();
+            item.Cancel();
         }
     }
 

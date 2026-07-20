@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
-using Microsoft.Web.WebView2.Core;
 
 namespace Quartz.Models;
 
@@ -13,6 +12,7 @@ internal sealed class DownloadItem : INotifyPropertyChanged
     private bool _isActive;
     private bool _isCompleted;
     private DateTimeOffset? _completedAt;
+    private Action? _cancel;
 
     private DownloadItem(
         string fileName,
@@ -80,23 +80,28 @@ internal sealed class DownloadItem : INotifyPropertyChanged
             ? $"{FormatBytes(_bytesReceived)} of {FormatBytes(_totalBytes.Value)} ({ProgressPercent:0}%)"
             : $"{FormatBytes(_bytesReceived)} downloaded";
 
-    internal CoreWebView2DownloadOperation? Operation { get; private set; }
+    internal int EngineId { get; private set; }
 
     internal static DownloadItem CreateActive(
-        CoreWebView2DownloadOperation operation,
-        string savePath) =>
+        int engineId,
+        string sourceUrl,
+        string savePath,
+        long bytesReceived,
+        long totalBytes,
+        Action cancel) =>
         new(
             Path.GetFileName(savePath),
-            operation.Uri ?? string.Empty,
+            sourceUrl,
             savePath,
             "Downloading",
             isActive: true,
             isCompleted: false,
-            operation.BytesReceived,
-            operation.TotalBytesToReceive,
+            Math.Max(0, bytesReceived),
+            totalBytes > 0 ? (ulong)totalBytes : null,
             completedAt: null)
         {
-            Operation = operation
+            EngineId = engineId,
+            _cancel = cancel
         };
 
     internal static DownloadItem FromRecord(DownloadRecord record)
@@ -132,22 +137,24 @@ internal sealed class DownloadItem : INotifyPropertyChanged
         IsCompleted = true;
         CompletedAt = completedAt;
         Status = "Completed";
-        Operation = null;
+        _cancel = null;
         OnPropertyChanged(nameof(ProgressPercent));
         OnPropertyChanged(nameof(IsIndeterminate));
         OnPropertyChanged(nameof(ProgressText));
     }
 
-    internal void MarkInterrupted(CoreWebView2DownloadInterruptReason reason)
+    internal void MarkInterrupted(bool canceled, string? reason)
     {
         IsActive = false;
         IsCompleted = false;
-        Status = reason == CoreWebView2DownloadInterruptReason.UserCanceled
+        Status = canceled
             ? "Canceled"
-            : $"Failed: {AddSpaces(reason.ToString())}";
-        Operation = null;
+            : string.IsNullOrWhiteSpace(reason) ? "Failed" : $"Failed: {reason}";
+        _cancel = null;
         OnPropertyChanged(nameof(IsIndeterminate));
     }
+
+    internal void Cancel() => _cancel?.Invoke();
 
     internal DownloadRecord ToRecord() =>
         new()
@@ -177,9 +184,6 @@ internal sealed class DownloadItem : INotifyPropertyChanged
             ? $"{displayValue:0} {units[unitIndex]}"
             : $"{displayValue:0.##} {units[unitIndex]}";
     }
-
-    private static string AddSpaces(string value) =>
-        System.Text.RegularExpressions.Regex.Replace(value, "(?<!^)([A-Z])", " $1");
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

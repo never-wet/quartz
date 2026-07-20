@@ -330,9 +330,14 @@
                             Click="SettingsButton_Click" />
                     <Button x:Name="SidebarPerformanceButton"
                             Style="{StaticResource ToolbarButtonStyle}"
-                            Width="40" Margin="0"
+                            Width="40" Margin="0,0,0,7"
                             Content="&#x25A5;" ToolTip="Performance information"
                             Click="PerformanceButton_Click" />
+                    <Button x:Name="SidebarExtensionsButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Width="40" Margin="0"
+                            Content="&#x2B21;" ToolTip="Extensions"
+                            Click="ExtensionsButton_Click" />
                 </StackPanel>
             </Border>
 
@@ -807,8 +812,145 @@
                                             Click="NewPrivateWindowButton_Click" />
                                 </StackPanel>
                             </Border>
+
+                            <Border Margin="0,12,0,0"
+                                    Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="Chromium extensions" />
+                                    <TextBlock Margin="0,4,0,10"
+                                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                               FontSize="11"
+                                               Text="Manage local unpacked extensions. Changes apply after Quartz restarts."
+                                               TextWrapping="Wrap" />
+                                    <Button Height="32"
+                                            Padding="10,0"
+                                            Style="{StaticResource QuartzButtonStyle}"
+                                            HorizontalContentAlignment="Left"
+                                            Content="Manage extensions"
+                                            Click="ExtensionsButton_Click" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border x:Name="ExtensionsPanel"
+                    Grid.Row="0"
+                    Grid.Column="2"
+                    Width="420"
+                    Style="{StaticResource PanelBorderStyle}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="50" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                <Border Width="4" Height="22" Margin="0,0,9,0" Background="{DynamicResource QuartzAccentBrush}" CornerRadius="2" />
+                                <TextBlock VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" Text="Extensions" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Height="30"
+                                    Margin="0,0,8,0"
+                                    Padding="10,0"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    Content="Load unpacked"
+                                    ToolTip="Choose a local extension folder containing manifest.json"
+                                    Click="LoadUnpackedExtensionButton_Click" />
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource PanelCloseButtonStyle}"
+                                    Content="&#x00D7;"
+                                    ToolTip="Close extensions"
+                                    Click="CloseExtensionsButton_Click" />
+                        </Grid>
+                    </Border>
+                    <Border Grid.Row="1"
+                            Margin="14,12,14,4"
+                            Padding="10"
+                            Background="{DynamicResource QuartzAccentSoftBrush}"
+                            BorderBrush="{DynamicResource QuartzAccentBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <TextBlock FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Text="Experimental: CEF loads enabled unpacked extensions when Quartz starts. Extensions that require Chrome's own toolbar, store installation, or unsupported APIs may not work." />
+                    </Border>
+                    <ListBox x:Name="ExtensionsItems"
+                             Grid.Row="2"
+                             Margin="14,8,14,14"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,0,0,8" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource PanelCardStyle}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                                   Margin="8,0,0,0"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   FontSize="11"
+                                                   Text="{Binding Version}" />
+                                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                                                   Margin="0,5,0,0"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   FontSize="10"
+                                                   Text="{Binding FolderPath}"
+                                                   ToolTip="{Binding FolderPath}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
+                                                   Margin="0,4,0,8"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   FontSize="11"
+                                                   Text="{Binding Status}" />
+                                        <CheckBox Grid.Row="3" Grid.Column="0"
+                                                  VerticalAlignment="Center"
+                                                  Content="Enabled"
+                                                  IsChecked="{Binding IsEnabled}"
+                                                  Tag="{Binding}"
+                                                  Click="ExtensionEnabledCheckBox_Click" />
+                                        <Button Grid.Row="3" Grid.Column="1"
+                                                Height="28"
+                                                Padding="10,0"
+                                                Style="{StaticResource QuartzButtonStyle}"
+                                                Content="Remove"
+                                                Tag="{Binding}"
+                                                Click="RemoveExtensionButton_Click" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
             </Border>
 
@@ -837,20 +979,20 @@
                         <StackPanel Margin="16">
                             <Border Margin="0,0,0,12" Padding="12" Background="{DynamicResource QuartzAccentSoftBrush}" BorderBrush="{DynamicResource QuartzAccentBrush}" BorderThickness="1" CornerRadius="8">
                                 <StackPanel>
-                                    <TextBlock FontWeight="SemiBold" Text="Managed by Windows and WebView2" />
+                                            <TextBlock FontWeight="SemiBold" Text="Managed by Windows and Chromium/CEF" />
                                     <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Quartz does not currently impose custom CPU, memory, or network limits." />
                                 </StackPanel>
                             </Border>
                             <Border Margin="0,0,0,10" Style="{StaticResource PanelCardStyle}">
                                 <StackPanel>
                                     <TextBlock FontWeight="SemiBold" Text="Browser processes" />
-                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="WebView2 may use multiple renderer, network, and utility processes. Windows Task Manager provides the authoritative live usage view." />
+                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Chromium/CEF uses multiple renderer, network, GPU, and utility processes. Windows Task Manager provides the authoritative live usage view." />
                                 </StackPanel>
                             </Border>
                             <Border Margin="0,0,0,10" Style="{StaticResource PanelCardStyle}">
                                 <StackPanel>
                                     <TextBlock FontWeight="SemiBold" Text="Current limitation" />
-                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="WebView2 does not expose safe per-tab resource caps through Quartz's current integration." />
+                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="CEF does not expose safe per-tab resource caps through Quartz's current integration." />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource PanelCardStyle}">

@@ -4,9 +4,35 @@ This file tracks major Quartz browser versions, completed work, and known issues
 
 ## Current Version
 
-Current stable version: **1.0**
+Current stable version: **2.0**
 
-Latest completed update: **1.1**
+Latest completed update: **2.0**
+
+## Version 2.0
+
+Quartz 2.0 is the browser-engine migration release.
+
+Completed work:
+
+- Replaced Microsoft WebView2 with CefSharp WPF and Chromium Embedded Framework 150.
+- Removed the WebView2 NuGet dependency and all WebView2-specific tab, navigation, profile, download, permission, certificate, favicon, and web-message code.
+- Preserved tabs, address/search handling, bookmarks, history, settings, themes, the Quartz new-tab page, private windows, and site-security UI.
+- Reimplemented downloads through CEF callbacks with Quartz progress/history/cancel/open actions.
+- Reimplemented page popups as Quartz tabs, permission prompts through CEF handlers, certificate blocking, and favicon URL handling.
+- Added persistent normal CEF profile data and isolated in-memory private request contexts.
+- Added an Extensions panel for validating, enabling, disabling, persisting, and removing local unpacked Manifest V3 extension folders.
+- Enabled experimental startup extension loading through Chromium's `--load-extension` switch.
+- Updated the self-contained x64 publish and Inno Setup installer to include CEF binaries, resources, and locales instead of installing WebView2.
+- Updated version metadata to 2.0.0.
+
+Extension limitations:
+
+- Changes require a Quartz restart because current CEF removed the older dynamic extension API.
+- Direct Chrome Web Store installation is not supported.
+- Quartz uses a custom WPF/off-screen CEF window. Extensions that depend on Chrome's toolbar or other Chrome-owned UI are not supported reliably; non-toolbar extensions must be tested case by case.
+- Some Chrome extension APIs and Google services are unavailable in CEF.
+
+Packaging note: the self-contained Quartz 2.0 publish is roughly 552 MB before installer compression because Chromium/CEF and .NET are bundled.
 
 ## Version 1.0
 
@@ -85,7 +111,7 @@ Release and distribution work completed for 1.1:
 ## Known Issues To Watch
 
 - Resource controls should not claim to limit CPU, memory, or network unless real limiting is implemented.
-- WebView2 may have limitations around deep browser features like true resource limiting, full extension support, and complete private-profile cleanup.
+- CEF may have limitations around true resource limiting, full Chrome extension support, proprietary media codecs, and complete site-data cleanup.
 - Theme changes need careful contrast testing across every panel and control.
 - Downloads should use Quartz UI only, not the default Edge-looking downloads UI.
 - Tabs need favicon fallback behavior for sites without a standard favicon.

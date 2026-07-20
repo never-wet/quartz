@@ -1,15 +1,18 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
+using CefSharp;
+using CefSharp.Wpf;
+using Microsoft.Win32;
 using Quartz.Models;
 using Quartz.Services;
+using QuartzDownloadItem = Quartz.Models.DownloadItem;
 
 namespace Quartz;
 
@@ -24,7 +27,9 @@ public partial class MainWindow : Window
     private readonly DownloadService _downloadService;
     private readonly HistoryService _historyService;
     private readonly SettingsService _settingsService;
-    private Task<CoreWebView2Environment>? _privateEnvironmentTask;
+    private readonly ExtensionService _extensionService;
+    private readonly IRequestContext _requestContext;
+    private readonly bool _ownsRequestContext;
     private BrowserTab? _activeTab;
     private bool _isPopulatingSettings;
 
@@ -37,6 +42,16 @@ public partial class MainWindow : Window
             ? Path.Combine(Path.GetTempPath(), $"Quartz-Private-{Guid.NewGuid():N}")
             : null;
         InitializeComponent();
+        if (isPrivate)
+        {
+            // An empty CEF cache path creates an in-memory, isolated request context.
+            _requestContext = new RequestContext(new RequestContextSettings());
+            _ownsRequestContext = true;
+        }
+        else
+        {
+            _requestContext = Cef.GetGlobalRequestContext();
+        }
         _bookmarkService = BookmarkService.CreateDefault();
         _downloadService = isPrivate
             ? DownloadService.CreatePrivate(_privateDataDirectory!)
@@ -45,10 +60,12 @@ public partial class MainWindow : Window
             ? HistoryService.CreatePrivate(_privateDataDirectory!)
             : HistoryService.CreateDefault();
         _settingsService = SettingsService.CreateDefault();
+        _extensionService = ExtensionService.CreateDefault();
         ThemeManager.AppearanceChanged += ThemeManager_AppearanceChanged;
         BookmarksItems.ItemsSource = _bookmarkService.Bookmarks;
         HistoryItems.ItemsSource = _historyService.Entries;
         DownloadsItems.ItemsSource = _downloadService.Downloads;
+        ExtensionsItems.ItemsSource = _extensionService.Extensions;
         _downloadService.PersistenceFailed += DownloadService_PersistenceFailed;
         PopulateSettingsControls();
         ApplySidebarVisibility(_settingsService.Current.SidebarVisible);
@@ -150,10 +167,24 @@ public partial class MainWindow : Window
         MaximizeRestoreWindowButton.ToolTip = isMaximized ? "Restore" : "Maximize";
     }
 
-    private async Task CreateTabAsync(string? initialAddress = null, bool selectAddressBar = false)
+    private Task CreateTabAsync(string? initialAddress = null, bool selectAddressBar = false)
     {
-        var tab = new BrowserTab(new WebView2());
+        var browser = new ChromiumWebBrowser
+        {
+            RequestContext = _requestContext,
+            BrowserSettings = new CefSharp.BrowserSettings
+            {
+                Javascript = CefState.Enabled,
+                ImageLoading = CefState.Enabled,
+                LocalStorage = CefState.Enabled,
+                WebGl = CefState.Enabled
+            }
+        };
+        var tab = new BrowserTab(browser);
         tab.HeaderItem = CreateTabHeader(tab);
+
+        ConfigureBrowser(tab);
+        tab.IsInitialized = true;
 
         _tabs.Add(tab);
         Tabs.Items.Add(tab.HeaderItem);
@@ -164,26 +195,6 @@ public partial class MainWindow : Window
         {
             SetLoadingState(true);
             StatusText.Text = "Starting browser engine...";
-
-            if (_isPrivate)
-            {
-                _privateEnvironmentTask ??=
-                    CoreWebView2Environment.CreateAsync(userDataFolder: _privateDataDirectory);
-            }
-
-            var environment = _privateEnvironmentTask is null
-                ? null
-                : await _privateEnvironmentTask;
-            await tab.Browser.EnsureCoreWebView2Async(environment);
-
-            if (tab.IsClosed)
-            {
-                return;
-            }
-
-            ConfigureBrowser(tab);
-            tab.IsInitialized = true;
-
             Navigate(tab, initialAddress ?? BrowserSettings.NewTabPage);
 
             if (selectAddressBar)
@@ -196,7 +207,7 @@ public partial class MainWindow : Window
         {
             if (tab.IsClosed)
             {
-                return;
+                return Task.CompletedTask;
             }
 
             tab.IsLoading = false;
@@ -204,11 +215,13 @@ public partial class MainWindow : Window
             SetLoadingState(false);
             StatusText.Text = tab.Status;
             MessageBox.Show(
-                $"Quartz could not start WebView2. Make sure the Microsoft Edge WebView2 Runtime is installed.\n\n{exception.Message}",
+                $"Quartz could not start its Chromium/CEF engine.\n\n{exception.Message}",
                 "Quartz startup error",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+
+        return Task.CompletedTask;
     }
 
     private TabItem CreateTabHeader(BrowserTab tab)
@@ -260,34 +273,82 @@ public partial class MainWindow : Window
 
     private void ConfigureBrowser(BrowserTab tab)
     {
-        var core = tab.Browser.CoreWebView2;
-        core.Settings.AreDefaultContextMenusEnabled = true;
-        core.Settings.AreDevToolsEnabled = true;
-        core.Settings.IsStatusBarEnabled = false;
-        core.Settings.IsWebMessageEnabled = true;
+        tab.Browser.DownloadHandler = new CefDownloadHandler(
+            _downloadService,
+            Dispatcher,
+            status =>
+            {
+                StatusText.Text = status;
+                ShowDownloadsPanel();
+            });
+        tab.Browser.PermissionHandler = new CefPermissionHandler(this, Dispatcher);
+        tab.Browser.RequestHandler = new CefRequestHandler(
+            Dispatcher,
+            (url, error) => ShowCertificateWarning(tab, url, error));
+        tab.Browser.LifeSpanHandler = new CefLifeSpanHandler(
+            Dispatcher,
+            url => _ = CreateTabAsync(url));
+        tab.Browser.DisplayHandler = new CefDisplayHandler(url =>
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                tab.FaviconUrl = url;
+                _ = UpdateTabFaviconAsync(tab);
+            })));
 
-        core.NavigationStarting += (_, e) =>
+        tab.Browser.FrameLoadStart += (_, e) =>
         {
-            if (!tab.IsRenderingNewTabPage)
+            if (!e.Frame.IsMain)
             {
-                tab.IsNewTabPage = false;
+                return;
             }
 
-            tab.IsLoading = true;
-            tab.FaviconImage.Source = DefaultTabIcon;
-            tab.Status = $"Loading {e.Uri}";
-            if (tab == _activeTab)
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                SetLoadingState(true);
-                StatusText.Text = tab.Status;
-            }
+                tab.LastLoadFailed = false;
+                if (!tab.IsRenderingNewTabPage)
+                {
+                    tab.IsNewTabPage = false;
+                }
+
+                tab.IsLoading = true;
+                tab.FaviconUrl = null;
+                tab.FaviconImage.Source = DefaultTabIcon;
+                tab.Status = $"Loading {e.Url}";
+                if (tab == _activeTab)
+                {
+                    SetLoadingState(true);
+                    StatusText.Text = tab.Status;
+                }
+            }));
         };
 
-        core.NavigationCompleted += (_, e) =>
+        tab.Browser.LoadError += (_, e) =>
         {
-            tab.IsLoading = false;
+            if (!e.Frame.IsMain || e.ErrorCode == CefErrorCode.Aborted)
+            {
+                return;
+            }
 
-            if (e.IsSuccess)
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                tab.LastLoadFailed = true;
+                tab.Status = $"This page could not be loaded ({e.ErrorCode}).";
+                if (tab == _activeTab)
+                {
+                    StatusText.Text = tab.Status;
+                    MessageBox.Show(
+                        tab.Status + $"\n\n{e.FailedUrl}\n{e.ErrorText}",
+                        "Quartz navigation error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+            }));
+        };
+
+        tab.Browser.LoadingStateChanged += (_, e) => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            tab.IsLoading = e.IsLoading;
+            if (!e.IsLoading)
             {
                 if (tab.IsRenderingNewTabPage)
                 {
@@ -295,55 +356,27 @@ public partial class MainWindow : Window
                     tab.IsNewTabPage = true;
                     tab.Status = "Quartz new tab";
                 }
-                else
+                else if (!tab.LastLoadFailed)
                 {
                     tab.Status = "Done";
                     RecordSuccessfulNavigation(tab);
+                    _ = UpdateTabFaviconAsync(tab);
                 }
             }
-            else if (e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled)
+
+            if (tab == _activeTab)
             {
-                tab.Status = "Navigation canceled";
+                SetLoadingState(e.IsLoading);
+                UpdateNavigationButtons();
+                UpdateAddressBar();
+                UpdateBookmarkButton();
+                UpdateSecurityIndicator();
+                UpdateSiteInfoPanel();
+                StatusText.Text = tab.Status;
             }
-            else
-            {
-                tab.Status = $"This page could not be loaded ({e.WebErrorStatus}).";
-            }
+        }));
 
-            if (e.IsSuccess && !tab.IsNewTabPage)
-            {
-                _ = UpdateTabFaviconAsync(tab);
-            }
-
-            if (tab != _activeTab)
-            {
-                return;
-            }
-
-            SetLoadingState(false);
-            UpdateNavigationButtons();
-            UpdateAddressBar();
-            UpdateBookmarkButton();
-            UpdateSecurityIndicator();
-            UpdateSiteInfoPanel();
-            StatusText.Text = tab.Status;
-
-            if (e.IsSuccess || e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled)
-            {
-                return;
-            }
-
-            var securityError = IsCertificateError(e.WebErrorStatus);
-            MessageBox.Show(
-                securityError
-                    ? $"Quartz blocked this page because its security certificate could not be verified.\n\n{e.WebErrorStatus}"
-                    : tab.Status,
-                securityError ? "Quartz security warning" : "Quartz navigation error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        };
-
-        core.SourceChanged += (_, _) =>
+        tab.Browser.AddressChanged += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
         {
             if (tab == _activeTab)
             {
@@ -352,65 +385,43 @@ public partial class MainWindow : Window
                 UpdateSecurityIndicator();
                 UpdateSiteInfoPanel();
             }
-        };
+        }));
 
-        core.DocumentTitleChanged += (_, _) =>
+        tab.Browser.TitleChanged += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
         {
-            var pageTitle = tab.Browser.CoreWebView2.DocumentTitle;
-            tab.Title = tab.IsNewTabPage || string.IsNullOrWhiteSpace(pageTitle) ? "New tab" : pageTitle;
+            var browserTitle = tab.Browser.Title;
+            tab.Title = tab.IsNewTabPage || string.IsNullOrWhiteSpace(browserTitle) ? "New tab" : browserTitle;
             tab.TitleBlock.Text = tab.Title;
-
             if (tab == _activeTab)
             {
                 UpdateWindowTitle();
             }
-        };
+        }));
 
-        core.HistoryChanged += (_, _) =>
+        tab.Browser.JavascriptMessageReceived += (_, e) => Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (tab == _activeTab)
-            {
-                UpdateNavigationButtons();
-            }
-        };
-
-        core.DownloadStarting += (_, e) => HandleDownloadStarting(e);
-        core.PermissionRequested += (_, e) => HandlePermissionRequested(e);
-        core.FaviconChanged += async (_, _) => await UpdateTabFaviconAsync(tab);
-        core.WebMessageReceived += (_, e) =>
-        {
-            if (!tab.IsNewTabPage)
-            {
-                return;
-            }
-
-            var input = e.TryGetWebMessageAsString();
-            if (!string.IsNullOrWhiteSpace(input))
+            if (tab.IsNewTabPage && e.Message is string input && !string.IsNullOrWhiteSpace(input))
             {
                 Navigate(tab, input);
             }
-        };
-        core.ServerCertificateErrorDetected += (_, e) =>
-        {
-            e.Action = CoreWebView2ServerCertificateErrorAction.Cancel;
-            if (tab == _activeTab)
-            {
-                MessageBox.Show(
-                    $"Quartz blocked a connection whose certificate could not be verified.\n\n{e.RequestUri}\n{e.ErrorStatus}",
-                    "Quartz security warning",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-        };
+        }));
+    }
 
-        core.NewWindowRequested += (_, e) =>
+    private void ShowCertificateWarning(BrowserTab tab, string url, CefErrorCode error)
+    {
+        tab.LastLoadFailed = true;
+        tab.Status = "Quartz blocked a connection whose certificate could not be verified.";
+        if (tab != _activeTab)
         {
-            e.Handled = true;
-            if (!string.IsNullOrWhiteSpace(e.Uri))
-            {
-                _ = CreateTabAsync(e.Uri);
-            }
-        };
+            return;
+        }
+
+        StatusText.Text = tab.Status;
+        MessageBox.Show(
+            $"{tab.Status}\n\n{url}\n{error}",
+            "Quartz security warning",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
     }
 
     private async Task UpdateTabFaviconAsync(BrowserTab tab)
@@ -421,23 +432,23 @@ public partial class MainWindow : Window
             return;
         }
 
-        var core = tab.Browser.CoreWebView2;
-        var expectedSource = core.Source;
+        var expectedSource = tab.Browser.Address;
         ImageSource? favicon = null;
-        try
+        var faviconUrl = tab.FaviconUrl;
+
+        if (Uri.TryCreate(faviconUrl, UriKind.Absolute, out var faviconUri) &&
+            (faviconUri.Scheme == Uri.UriSchemeHttp || faviconUri.Scheme == Uri.UriSchemeHttps))
         {
-            await using var nativeStream = await core.GetFaviconAsync(CoreWebView2FaviconImageFormat.Png);
-            using var bufferedStream = new MemoryStream();
-            await nativeStream.CopyToAsync(bufferedStream);
-            if (bufferedStream.Length > 0)
+            try
             {
-                bufferedStream.Position = 0;
-                favicon = CreateFaviconImage(bufferedStream);
+                var bytes = await FaviconClient.GetByteArrayAsync(faviconUri);
+                using var stream = new MemoryStream(bytes, writable: false);
+                favicon = CreateFaviconImage(stream);
             }
-        }
-        catch (Exception exception) when (
-            exception is InvalidOperationException or IOException or ArgumentException or NotSupportedException or System.Runtime.InteropServices.COMException)
-        {
+            catch (Exception exception) when (
+                exception is HttpRequestException or TaskCanceledException or IOException or ArgumentException or NotSupportedException)
+            {
+            }
         }
 
         if (favicon is null && Uri.TryCreate(expectedSource, UriKind.Absolute, out var pageUri) &&
@@ -456,7 +467,7 @@ public partial class MainWindow : Window
             }
         }
 
-        if (tab.IsClosed || !string.Equals(expectedSource, core.Source, StringComparison.Ordinal))
+        if (tab.IsClosed || !string.Equals(expectedSource, tab.Browser.Address, StringComparison.Ordinal))
         {
             return;
         }
@@ -521,7 +532,7 @@ public partial class MainWindow : Window
             AddressBar.Text = destination.AbsoluteUri;
         }
 
-        tab.Browser.CoreWebView2.Navigate(destination.AbsoluteUri);
+        tab.Browser.Load(destination.AbsoluteUri);
     }
 
     private void ShowNewTabPage(BrowserTab tab)
@@ -536,7 +547,9 @@ public partial class MainWindow : Window
         tab.Title = "New tab";
         tab.TitleBlock.Text = tab.Title;
         tab.Status = "Quartz new tab";
-        tab.Browser.CoreWebView2.NavigateToString(NewTabPageBuilder.Build(_bookmarkService.Bookmarks));
+        tab.Browser.LoadHtml(
+            NewTabPageBuilder.Build(_bookmarkService.Bookmarks),
+            "https://quartz.local/newtab/");
 
         if (tab == _activeTab)
         {
@@ -612,14 +625,13 @@ public partial class MainWindow : Window
 
         AddressBar.Text = _activeTab.IsNewTabPage
             ? string.Empty
-            : _activeTab.Browser.Source?.AbsoluteUri ?? _activeTab.Browser.CoreWebView2?.Source ?? string.Empty;
+            : _activeTab.Browser.Address ?? string.Empty;
     }
 
     private void UpdateNavigationButtons()
     {
-        var core = _activeTab?.Browser.CoreWebView2;
-        BackButton.IsEnabled = core?.CanGoBack == true;
-        ForwardButton.IsEnabled = core?.CanGoForward == true;
+        BackButton.IsEnabled = _activeTab?.Browser.CanGoBack == true;
+        ForwardButton.IsEnabled = _activeTab?.Browser.CanGoForward == true;
     }
 
     private void UpdateWindowTitle()
@@ -689,26 +701,24 @@ public partial class MainWindow : Window
         {
             SiteConnectionText.Text = "Local or internal page";
             SiteConnectionText.Foreground = (System.Windows.Media.Brush)FindResource("QuartzMutedTextBrush");
-            SitePrivacyNoteText.Text = "This page is provided by Quartz or WebView2 and does not use a normal website connection.";
+            SitePrivacyNoteText.Text = "This page is provided by Quartz or Chromium and does not use a normal website connection.";
         }
     }
 
     private Uri? GetCurrentPageUri()
     {
-        var source = _activeTab?.Browser.CoreWebView2?.Source ?? _activeTab?.Browser.Source?.AbsoluteUri;
+        if (_activeTab?.IsNewTabPage == true)
+        {
+            return null;
+        }
+
+        var source = _activeTab?.Browser.Address;
         return Uri.TryCreate(source, UriKind.Absolute, out var uri) ? uri : null;
     }
 
-    private static bool IsCertificateError(CoreWebView2WebErrorStatus status) =>
-        status is CoreWebView2WebErrorStatus.CertificateCommonNameIsIncorrect or
-            CoreWebView2WebErrorStatus.CertificateExpired or
-            CoreWebView2WebErrorStatus.ClientCertificateContainsErrors or
-            CoreWebView2WebErrorStatus.CertificateRevoked or
-            CoreWebView2WebErrorStatus.CertificateIsInvalid;
-
     private string? GetActivePageUrl()
     {
-        var source = _activeTab?.Browser.CoreWebView2?.Source;
+        var source = _activeTab?.IsNewTabPage == true ? null : _activeTab?.Browser.Address;
         if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
@@ -769,9 +779,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var core = tab.Browser.CoreWebView2;
-        var url = core.Source;
-        var title = core.DocumentTitle;
+        var url = tab.Browser.Address;
+        var title = tab.Title;
 
         try
         {
@@ -802,6 +811,7 @@ public partial class MainWindow : Window
             SettingsPanel.Visibility = Visibility.Collapsed;
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
+            ExtensionsPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
             SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
@@ -821,6 +831,7 @@ public partial class MainWindow : Window
             HistoryPanel.Visibility = Visibility.Collapsed;
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
+            ExtensionsPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
             HistoryButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
@@ -841,6 +852,7 @@ public partial class MainWindow : Window
             HistoryPanel.Visibility = Visibility.Collapsed;
             SettingsPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
+            ExtensionsPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
             HistoryButton.FontWeight = FontWeights.Normal;
             SettingsButton.FontWeight = FontWeights.Normal;
@@ -967,6 +979,7 @@ public partial class MainWindow : Window
             SettingsPanel.Visibility = Visibility.Collapsed;
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             DownloadsPanel.Visibility = Visibility.Collapsed;
+            ExtensionsPanel.Visibility = Visibility.Collapsed;
             HistoryButton.FontWeight = FontWeights.Normal;
             SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
@@ -986,6 +999,7 @@ public partial class MainWindow : Window
             SettingsPanel.Visibility = Visibility.Collapsed;
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
+            ExtensionsPanel.Visibility = Visibility.Collapsed;
             HistoryButton.FontWeight = FontWeights.Normal;
             SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
@@ -996,6 +1010,26 @@ public partial class MainWindow : Window
         SidePanelColumn.Width = willShow ? new GridLength(420) : new GridLength(0);
     }
 
+    private void ToggleExtensionsPanel()
+    {
+        var willShow = ExtensionsPanel.Visibility != Visibility.Visible;
+        if (willShow)
+        {
+            HistoryPanel.Visibility = Visibility.Collapsed;
+            SettingsPanel.Visibility = Visibility.Collapsed;
+            SiteInfoPanel.Visibility = Visibility.Collapsed;
+            PerformancePanel.Visibility = Visibility.Collapsed;
+            DownloadsPanel.Visibility = Visibility.Collapsed;
+            HistoryButton.FontWeight = FontWeights.Normal;
+            SettingsButton.FontWeight = FontWeights.Normal;
+            SecurityButton.FontWeight = FontWeights.Normal;
+            DownloadsButton.FontWeight = FontWeights.Normal;
+        }
+
+        ExtensionsPanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
+        SidePanelColumn.Width = willShow ? new GridLength(420) : new GridLength(0);
+    }
+
     private void ShowDownloadsPanel()
     {
         if (DownloadsPanel.Visibility != Visibility.Visible)
@@ -1003,61 +1037,6 @@ public partial class MainWindow : Window
             ToggleDownloadsPanel();
         }
     }
-
-    private void HandleDownloadStarting(CoreWebView2DownloadStartingEventArgs e)
-    {
-        try
-        {
-            var savePath = _downloadService.CreateSavePath(e.ResultFilePath, e.DownloadOperation.Uri);
-            e.ResultFilePath = savePath;
-            e.Handled = true;
-            var item = _downloadService.Track(e.DownloadOperation, savePath);
-            StatusText.Text = $"Downloading {item.FileName}...";
-            ShowDownloadsPanel();
-        }
-        catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            e.Cancel = true;
-            MessageBox.Show(
-                $"Quartz could not start this download.\n\n{exception.Message}",
-                "Quartz download error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
-    }
-
-    private void HandlePermissionRequested(CoreWebView2PermissionRequestedEventArgs e)
-    {
-        var permissionName = GetPermissionName(e.PermissionKind);
-        if (permissionName is null)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        e.SavesInProfile = false;
-        e.State = CoreWebView2PermissionState.Deny;
-
-        var origin = e.Uri ?? string.Empty;
-        var domain = Uri.TryCreate(origin, UriKind.Absolute, out var uri) && !string.IsNullOrWhiteSpace(uri.Host)
-            ? uri.Host
-            : "This site";
-        var prompt = new PermissionPromptWindow(domain, permissionName, origin) { Owner = this };
-        if (prompt.ShowDialog() == true)
-        {
-            e.State = CoreWebView2PermissionState.Allow;
-        }
-    }
-
-    private static string? GetPermissionName(CoreWebView2PermissionKind kind) => kind switch
-    {
-        CoreWebView2PermissionKind.Camera => "camera",
-        CoreWebView2PermissionKind.Microphone => "microphone",
-        CoreWebView2PermissionKind.Geolocation => "location",
-        CoreWebView2PermissionKind.Notifications => "notifications",
-        _ => null
-    };
 
     private async Task ClearCurrentSiteDataAsync()
     {
@@ -1082,21 +1061,16 @@ public partial class MainWindow : Window
 
         try
         {
-            var core = tab.Browser.CoreWebView2;
-            var cookies = await core.CookieManager.GetCookiesAsync(uri.GetLeftPart(UriPartial.Authority));
-            foreach (var cookie in cookies)
-            {
-                core.CookieManager.DeleteCookie(cookie);
-            }
-
-            await core.ExecuteScriptAsync(
+            var cookieManager = await _requestContext.GetCookieManagerAsync();
+            await cookieManager.DeleteCookiesAsync(uri.GetLeftPart(UriPartial.Authority), null);
+            await tab.Browser.EvaluateScriptAsync(
                 "(async()=>{localStorage.clear();sessionStorage.clear();" +
                 "if(self.caches){for(const k of await caches.keys())await caches.delete(k);}" +
                 "if(indexedDB.databases){for(const d of await indexedDB.databases())if(d.name)indexedDB.deleteDatabase(d.name);}" +
                 "if(navigator.serviceWorker){for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();}})();");
             StatusText.Text = $"Site data cleared for {uri.Host}.";
         }
-        catch (Exception exception) when (exception is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        catch (Exception exception) when (exception is InvalidOperationException or ObjectDisposedException)
         {
             MessageBox.Show(
                 $"Quartz could not clear all accessible data for this site.\n\n{exception.Message}",
@@ -1108,8 +1082,7 @@ public partial class MainWindow : Window
 
     private async Task ClearProfileSiteDataAsync()
     {
-        var core = _activeTab?.Browser.CoreWebView2;
-        if (core is null)
+        if (_activeTab is null)
         {
             return;
         }
@@ -1123,14 +1096,21 @@ public partial class MainWindow : Window
 
         try
         {
-            var kinds = CoreWebView2BrowsingDataKinds.Cookies |
-                        CoreWebView2BrowsingDataKinds.AllDomStorage |
-                        CoreWebView2BrowsingDataKinds.CacheStorage |
-                        CoreWebView2BrowsingDataKinds.ServiceWorkers;
-            await core.Profile.ClearBrowsingDataAsync(kinds);
+            var cookieManager = await _requestContext.GetCookieManagerAsync();
+            await cookieManager.DeleteCookiesAsync();
+            using (var callback = new TaskCompletionCallback())
+            {
+                _requestContext.ClearHttpCache(callback);
+                await callback.Task;
+            }
+            foreach (var tab in _tabs.Where(item => item.IsInitialized && !item.IsClosed))
+            {
+                await tab.Browser.EvaluateScriptAsync(
+                    "(()=>{try{localStorage.clear();sessionStorage.clear();}catch{}})();");
+            }
             StatusText.Text = "Cookies and site data cleared.";
         }
-        catch (Exception exception) when (exception is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        catch (Exception exception) when (exception is InvalidOperationException or ObjectDisposedException)
         {
             MessageBox.Show(
                 $"Quartz could not clear the browser profile's site data.\n\n{exception.Message}",
@@ -1182,24 +1162,22 @@ public partial class MainWindow : Window
 
     private void BackButton_Click(object sender, RoutedEventArgs e)
     {
-        var core = _activeTab?.Browser.CoreWebView2;
-        if (core?.CanGoBack == true)
+        if (_activeTab?.Browser.CanGoBack == true)
         {
-            core.GoBack();
+            _activeTab.Browser.Back();
         }
     }
 
     private void ForwardButton_Click(object sender, RoutedEventArgs e)
     {
-        var core = _activeTab?.Browser.CoreWebView2;
-        if (core?.CanGoForward == true)
+        if (_activeTab?.Browser.CanGoForward == true)
         {
-            core.GoForward();
+            _activeTab.Browser.Forward();
         }
     }
 
     private void ReloadButton_Click(object sender, RoutedEventArgs e) =>
-        _activeTab?.Browser.CoreWebView2?.Reload();
+        _activeTab?.Browser.Reload();
 
     private void HomeButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1257,6 +1235,9 @@ public partial class MainWindow : Window
     private void PerformanceButton_Click(object sender, RoutedEventArgs e) =>
         TogglePerformancePanel();
 
+    private void ExtensionsButton_Click(object sender, RoutedEventArgs e) =>
+        ToggleExtensionsPanel();
+
     private void NewPrivateWindowButton_Click(object sender, RoutedEventArgs e) =>
         OpenPrivateWindow();
 
@@ -1295,6 +1276,84 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CloseExtensionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExtensionsPanel.Visibility == Visibility.Visible)
+        {
+            ToggleExtensionsPanel();
+        }
+    }
+
+    private void LoadUnpackedExtensionButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Choose an unpacked Chromium extension folder",
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var extension = _extensionService.AddUnpacked(dialog.FolderName);
+            StatusText.Text = $"{extension.Name} added. Restart Quartz to load it.";
+            MessageBox.Show(
+                $"{extension.Name} was added and will be passed to Chromium when Quartz next starts.\n\n" +
+                "CEF extension compatibility is experimental. Extensions that require Chrome's toolbar or Chrome Web Store services may not work.",
+                "Quartz extensions",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or JsonException or IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                $"Quartz could not add this unpacked extension.\n\n{exception.Message}",
+                "Quartz extensions",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void ExtensionEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox { Tag: BrowserExtension extension } checkBox)
+        {
+            return;
+        }
+
+        try
+        {
+            _extensionService.SetEnabled(extension, checkBox.IsChecked == true);
+            StatusText.Text = "Extension setting saved. Restart Quartz to apply it.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(exception.Message, "Quartz extensions", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RemoveExtensionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: BrowserExtension extension })
+        {
+            return;
+        }
+
+        try
+        {
+            _extensionService.Remove(extension);
+            StatusText.Text = $"{extension.Name} removed. Restart Quartz to unload it from this session.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(exception.Message, "Quartz extensions", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void CloseDownloadsButton_Click(object sender, RoutedEventArgs e)
     {
         if (DownloadsPanel.Visibility == Visibility.Visible)
@@ -1309,8 +1368,8 @@ public partial class MainWindow : Window
         StatusText.Text = "Completed download records cleared.";
     }
 
-    private static DownloadItem? GetDownloadItem(object sender) =>
-        (sender as FrameworkElement)?.Tag as DownloadItem;
+    private static QuartzDownloadItem? GetDownloadItem(object sender) =>
+        (sender as FrameworkElement)?.Tag as QuartzDownloadItem;
 
     private void OpenDownloadedFileButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1679,6 +1738,12 @@ public partial class MainWindow : Window
 
     private bool CloseOpenPanel()
     {
+        if (ExtensionsPanel.Visibility == Visibility.Visible)
+        {
+            ToggleExtensionsPanel();
+            return true;
+        }
+
         if (DownloadsPanel.Visibility == Visibility.Visible)
         {
             ToggleDownloadsPanel();
@@ -1723,6 +1788,11 @@ public partial class MainWindow : Window
         }
 
         _tabs.Clear();
+        if (_ownsRequestContext)
+        {
+            _requestContext.Dispose();
+        }
+
         if (_isPrivate && IsPrivateDataDirectory(_privateDataDirectory))
         {
             SchedulePrivateDataCleanup(_privateDataDirectory!);

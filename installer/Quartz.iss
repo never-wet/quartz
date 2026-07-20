@@ -1,5 +1,5 @@
 #define MyAppName "Quartz"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "Quartz contributors"
 #define MyAppExeName "Quartz.exe"
 #define PublishDir "..\artifacts\publish\win-x64"
@@ -10,7 +10,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-VersionInfoVersion=1.1.0.0
+VersionInfoVersion=2.0.0.0
 VersionInfoProductName=Quartz Browser
 VersionInfoProductVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
@@ -23,7 +23,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\release
-OutputBaseFilename=QuartzSetup
+OutputBaseFilename=Quartz-2.0.0-Setup
 SetupIconFile=..\src\Quartz\Assets\Quartz.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName=Quartz Browser
@@ -46,7 +46,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
 WelcomeLabel1=Welcome to Quartz
-WelcomeLabel2=Set up a focused browser workspace on this PC.%n%nQuartz includes its .NET runtime and can prepare WebView2 automatically when Windows needs it.
+WelcomeLabel2=Set up a focused Chromium browser workspace on this PC.%n%nQuartz includes its .NET runtime and Chromium/CEF engine files.
 FinishedHeadingLabel=Quartz is ready
 FinishedLabel=Setup has finished installing Quartz on your computer.
 
@@ -55,7 +55,7 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "dependencies\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "dependencies\VC_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\Quartz"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
@@ -63,13 +63,17 @@ Name: "{group}\Uninstall Quartz"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Quartz"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Preparing the WebView2 browser engine..."; Flags: waituntilterminated; Check: not IsWebView2Installed
+Filename: "{tmp}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Preparing the Chromium native runtime..."; Flags: waituntilterminated; Check: not IsVCRuntimeInstalled
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Quartz"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-function IsWebView2Installed: Boolean;
+function IsVCRuntimeInstalled: Boolean;
+var
+  Installed: Cardinal;
 begin
-  Result :=
-    DirExists(ExpandConstant('{pf32}\Microsoft\EdgeWebView\Application')) or
-    DirExists(ExpandConstant('{localappdata}\Microsoft\EdgeWebView\Application'));
+  Result := RegQueryDWordValue(
+    HKLM64,
+    'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64',
+    'Installed',
+    Installed) and (Installed = 1);
 end;

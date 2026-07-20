@@ -69,7 +69,7 @@ internal static class NewTabPageBuilder
                 <h2>Quick links</h2><div class="links">{{{links}}}</div>
               </main>
               <script>
-                document.getElementById('search').addEventListener('submit',event=>{event.preventDefault();const value=document.getElementById('query').value.trim();if(value&&window.chrome?.webview)window.chrome.webview.postMessage(value)});
+                document.getElementById('search').addEventListener('submit',event=>{event.preventDefault();const value=document.getElementById('query').value.trim();if(value&&window.CefSharp)CefSharp.PostMessage(value)});
               </script>
             </body>
             </html>
