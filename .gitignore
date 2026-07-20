@@ -8,3 +8,4 @@ TestResults/
 artifacts/
 installer/dependencies/
 release/*.exe
+website-deploy/
