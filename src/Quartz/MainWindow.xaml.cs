@@ -1,7 +1,11 @@
+using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Quartz.Models;
@@ -11,6 +15,8 @@ namespace Quartz;
 
 public partial class MainWindow : Window
 {
+    private static readonly ImageSource DefaultTabIcon = LoadDefaultTabIcon();
+    private static readonly HttpClient FaviconClient = CreateFaviconClient();
     private readonly bool _isPrivate;
     private readonly string? _privateDataDirectory;
     private readonly List<BrowserTab> _tabs = [];
@@ -19,7 +25,6 @@ public partial class MainWindow : Window
     private readonly HistoryService _historyService;
     private readonly SettingsService _settingsService;
     private Task<CoreWebView2Environment>? _privateEnvironmentTask;
-    private DownloadsWindow? _downloadsWindow;
     private BrowserTab? _activeTab;
     private bool _isPopulatingSettings;
 
@@ -43,6 +48,7 @@ public partial class MainWindow : Window
         ThemeManager.AppearanceChanged += ThemeManager_AppearanceChanged;
         BookmarksItems.ItemsSource = _bookmarkService.Bookmarks;
         HistoryItems.ItemsSource = _historyService.Entries;
+        DownloadsItems.ItemsSource = _downloadService.Downloads;
         _downloadService.PersistenceFailed += DownloadService_PersistenceFailed;
         PopulateSettingsControls();
         ApplySidebarVisibility(_settingsService.Current.SidebarVisible);
@@ -55,6 +61,8 @@ public partial class MainWindow : Window
             ToolbarBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("QuartzPrivateBrush");
             PrivateWindowButton.Foreground = (System.Windows.Media.Brush)FindResource("QuartzPrivateBrush");
             PrivateWindowButton.ToolTip = "Private profile active. Bookmarks created here are saved normally.";
+            DownloadsHeading.Text = "Private Downloads";
+            PrivateDownloadNotice.Visibility = Visibility.Visible;
         }
     }
 
@@ -62,11 +70,84 @@ public partial class MainWindow : Window
     {
         Width = Math.Min(Width, SystemParameters.WorkArea.Width);
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
+        UpdateMaximizeRestoreButton();
 
         var startupAddress = _settingsService.Current.StartupBehavior == StartupBehavior.BlankPage
             ? BrowserSettings.NewTabPage
             : _settingsService.Current.HomepageUrl;
         await CreateTabAsync(startupAddress);
+    }
+
+    private void Window_StateChanged(object? sender, EventArgs e)
+    {
+        UpdateMaximizeRestoreButton();
+    }
+
+    private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (WindowState == WindowState.Minimized || TabStripBorder is null)
+        {
+            return;
+        }
+
+        var point = e.GetPosition(TabStripBorder);
+        var inTabStrip = point.X >= 0 && point.Y >= 0 && point.X <= TabStripBorder.ActualWidth && point.Y <= TabStripBorder.ActualHeight;
+        if (!inTabStrip || IsTabStripControl(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        try
+        {
+            DragMove();
+            e.Handled = true;
+        }
+        catch (InvalidOperationException)
+        {
+            // The window can transition state between the hit test and DragMove.
+        }
+    }
+
+    private static bool IsTabStripControl(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is Button or TabItem)
+            {
+                return true;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return false;
+    }
+
+    private void MinimizeWindowButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void MaximizeRestoreWindowButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void CloseWindowButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void UpdateMaximizeRestoreButton()
+    {
+        if (MaximizeRestoreWindowButton is null)
+        {
+            return;
+        }
+
+        var isMaximized = WindowState == WindowState.Maximized;
+        MaximizeRestoreWindowButton.Content = isMaximized ? "\u2750" : "\u25A1";
+        MaximizeRestoreWindowButton.ToolTip = isMaximized ? "Restore" : "Maximize";
     }
 
     private async Task CreateTabAsync(string? initialAddress = null, bool selectAddressBar = false)
@@ -132,11 +213,20 @@ public partial class MainWindow : Window
 
     private TabItem CreateTabHeader(BrowserTab tab)
     {
+        var favicon = new Image
+        {
+            Width = 16,
+            Height = 16,
+            Margin = new Thickness(0, 0, 7, 0),
+            Source = DefaultTabIcon,
+            Stretch = Stretch.Uniform,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
         var title = new TextBlock
         {
             Text = "New tab",
-            MinWidth = 120,
-            MaxWidth = 220,
+            Width = 150,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -144,7 +234,7 @@ public partial class MainWindow : Window
         var closeButton = new Button
         {
             Content = "\u00D7",
-            Margin = new Thickness(8, 0, 0, 0),
+            Margin = new Thickness(5, 0, 0, 0),
             Style = (Style)FindResource("TabCloseButtonStyle"),
             ToolTip = "Close tab (Ctrl+W)"
         };
@@ -155,13 +245,14 @@ public partial class MainWindow : Window
         };
 
         tab.TitleBlock = title;
+        tab.FaviconImage = favicon;
 
         return new TabItem
         {
             Header = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Children = { title, closeButton }
+                Children = { favicon, title, closeButton }
             },
             Tag = tab
         };
@@ -183,6 +274,7 @@ public partial class MainWindow : Window
             }
 
             tab.IsLoading = true;
+            tab.FaviconImage.Source = DefaultTabIcon;
             tab.Status = $"Loading {e.Uri}";
             if (tab == _activeTab)
             {
@@ -216,6 +308,11 @@ public partial class MainWindow : Window
             else
             {
                 tab.Status = $"This page could not be loaded ({e.WebErrorStatus}).";
+            }
+
+            if (e.IsSuccess && !tab.IsNewTabPage)
+            {
+                _ = UpdateTabFaviconAsync(tab);
             }
 
             if (tab != _activeTab)
@@ -279,6 +376,7 @@ public partial class MainWindow : Window
 
         core.DownloadStarting += (_, e) => HandleDownloadStarting(e);
         core.PermissionRequested += (_, e) => HandlePermissionRequested(e);
+        core.FaviconChanged += async (_, _) => await UpdateTabFaviconAsync(tab);
         core.WebMessageReceived += (_, e) =>
         {
             if (!tab.IsNewTabPage)
@@ -313,6 +411,86 @@ public partial class MainWindow : Window
                 _ = CreateTabAsync(e.Uri);
             }
         };
+    }
+
+    private async Task UpdateTabFaviconAsync(BrowserTab tab)
+    {
+        if (tab.IsClosed || !tab.IsInitialized || tab.IsNewTabPage)
+        {
+            tab.FaviconImage.Source = DefaultTabIcon;
+            return;
+        }
+
+        var core = tab.Browser.CoreWebView2;
+        var expectedSource = core.Source;
+        ImageSource? favicon = null;
+        try
+        {
+            await using var nativeStream = await core.GetFaviconAsync(CoreWebView2FaviconImageFormat.Png);
+            using var bufferedStream = new MemoryStream();
+            await nativeStream.CopyToAsync(bufferedStream);
+            if (bufferedStream.Length > 0)
+            {
+                bufferedStream.Position = 0;
+                favicon = CreateFaviconImage(bufferedStream);
+            }
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or IOException or ArgumentException or NotSupportedException or System.Runtime.InteropServices.COMException)
+        {
+        }
+
+        if (favicon is null && Uri.TryCreate(expectedSource, UriKind.Absolute, out var pageUri) &&
+            (pageUri.Scheme == Uri.UriSchemeHttp || pageUri.Scheme == Uri.UriSchemeHttps))
+        {
+            try
+            {
+                var fallbackUri = new Uri(pageUri.GetLeftPart(UriPartial.Authority) + "/favicon.ico");
+                var bytes = await FaviconClient.GetByteArrayAsync(fallbackUri);
+                using var fallbackStream = new MemoryStream(bytes, writable: false);
+                favicon = CreateFaviconImage(fallbackStream);
+            }
+            catch (Exception exception) when (
+                exception is HttpRequestException or TaskCanceledException or IOException or ArgumentException or NotSupportedException)
+            {
+            }
+        }
+
+        if (tab.IsClosed || !string.Equals(expectedSource, core.Source, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        tab.FaviconImage.Source = favicon ?? DefaultTabIcon;
+    }
+
+    private static ImageSource CreateFaviconImage(Stream stream)
+    {
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.DecodePixelWidth = 16;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    private static HttpClient CreateFaviconClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Quartz/0.10");
+        return client;
+    }
+
+    private static ImageSource LoadDefaultTabIcon()
+    {
+        var bitmap = BitmapFrame.Create(
+            new Uri("pack://application:,,,/Assets/Quartz.ico", UriKind.Absolute),
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
+        bitmap.Freeze();
+        return bitmap;
     }
 
     private void Navigate(BrowserTab tab, string input)
@@ -469,14 +647,13 @@ public partial class MainWindow : Window
         if (uri?.Scheme == Uri.UriSchemeHttps)
         {
             SecurityButton.Content = "Secure";
-            SecurityButton.Foreground = (System.Windows.Media.Brush)FindResource("QuartzAccentBrush");
+            SecurityButton.Foreground = (System.Windows.Media.Brush)FindResource("QuartzSecureBrush");
             SecurityButton.ToolTip = "Secure HTTPS connection · click for site information";
         }
         else if (uri?.Scheme == Uri.UriSchemeHttp)
         {
             SecurityButton.Content = "Not secure";
-            SecurityButton.Foreground = new System.Windows.Media.SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(205, 83, 83));
+            SecurityButton.Foreground = (System.Windows.Media.Brush)FindResource("QuartzDangerBrush");
             SecurityButton.ToolTip = "Unencrypted HTTP connection · click for site information";
         }
         else
@@ -499,13 +676,13 @@ public partial class MainWindow : Window
         if (uri?.Scheme == Uri.UriSchemeHttps)
         {
             SiteConnectionText.Text = "Secure HTTPS connection";
-            SiteConnectionText.Foreground = (System.Windows.Media.Brush)FindResource("QuartzAccentBrush");
+            SiteConnectionText.Foreground = (System.Windows.Media.Brush)FindResource("QuartzSecureBrush");
             SitePrivacyNoteText.Text = "The connection is encrypted. The site may still store cookies and other data in this browser profile.";
         }
         else if (uri?.Scheme == Uri.UriSchemeHttp)
         {
             SiteConnectionText.Text = "Not secure HTTP connection";
-            SiteConnectionText.Foreground = System.Windows.Media.Brushes.DarkRed;
+            SiteConnectionText.Foreground = (System.Windows.Media.Brush)FindResource("QuartzDangerBrush");
             SitePrivacyNoteText.Text = "This connection is not encrypted. Avoid entering sensitive information on this page.";
         }
         else
@@ -625,8 +802,10 @@ public partial class MainWindow : Window
             SettingsPanel.Visibility = Visibility.Collapsed;
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
+            DownloadsPanel.Visibility = Visibility.Collapsed;
             SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
+            DownloadsButton.FontWeight = FontWeights.Normal;
         }
 
         HistoryPanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
@@ -642,8 +821,10 @@ public partial class MainWindow : Window
             HistoryPanel.Visibility = Visibility.Collapsed;
             SiteInfoPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
+            DownloadsPanel.Visibility = Visibility.Collapsed;
             HistoryButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
+            DownloadsButton.FontWeight = FontWeights.Normal;
             PopulateSettingsControls();
         }
 
@@ -660,8 +841,10 @@ public partial class MainWindow : Window
             HistoryPanel.Visibility = Visibility.Collapsed;
             SettingsPanel.Visibility = Visibility.Collapsed;
             PerformancePanel.Visibility = Visibility.Collapsed;
+            DownloadsPanel.Visibility = Visibility.Collapsed;
             HistoryButton.FontWeight = FontWeights.Normal;
             SettingsButton.FontWeight = FontWeights.Normal;
+            DownloadsButton.FontWeight = FontWeights.Normal;
             UpdateSiteInfoPanel();
         }
 
@@ -783,13 +966,42 @@ public partial class MainWindow : Window
             HistoryPanel.Visibility = Visibility.Collapsed;
             SettingsPanel.Visibility = Visibility.Collapsed;
             SiteInfoPanel.Visibility = Visibility.Collapsed;
+            DownloadsPanel.Visibility = Visibility.Collapsed;
+            HistoryButton.FontWeight = FontWeights.Normal;
+            SettingsButton.FontWeight = FontWeights.Normal;
+            SecurityButton.FontWeight = FontWeights.Normal;
+            DownloadsButton.FontWeight = FontWeights.Normal;
+        }
+
+        PerformancePanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
+        SidePanelColumn.Width = willShow ? new GridLength(360) : new GridLength(0);
+    }
+
+    private void ToggleDownloadsPanel()
+    {
+        var willShow = DownloadsPanel.Visibility != Visibility.Visible;
+        if (willShow)
+        {
+            HistoryPanel.Visibility = Visibility.Collapsed;
+            SettingsPanel.Visibility = Visibility.Collapsed;
+            SiteInfoPanel.Visibility = Visibility.Collapsed;
+            PerformancePanel.Visibility = Visibility.Collapsed;
             HistoryButton.FontWeight = FontWeights.Normal;
             SettingsButton.FontWeight = FontWeights.Normal;
             SecurityButton.FontWeight = FontWeights.Normal;
         }
 
-        PerformancePanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
-        SidePanelColumn.Width = willShow ? new GridLength(360) : new GridLength(0);
+        DownloadsPanel.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
+        DownloadsButton.FontWeight = willShow ? FontWeights.SemiBold : FontWeights.Normal;
+        SidePanelColumn.Width = willShow ? new GridLength(420) : new GridLength(0);
+    }
+
+    private void ShowDownloadsPanel()
+    {
+        if (DownloadsPanel.Visibility != Visibility.Visible)
+        {
+            ToggleDownloadsPanel();
+        }
     }
 
     private void HandleDownloadStarting(CoreWebView2DownloadStartingEventArgs e)
@@ -801,7 +1013,7 @@ public partial class MainWindow : Window
             e.Handled = true;
             var item = _downloadService.Track(e.DownloadOperation, savePath);
             StatusText.Text = $"Downloading {item.FileName}...";
-            ShowDownloadsWindow();
+            ShowDownloadsPanel();
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or ArgumentException)
@@ -1007,7 +1219,7 @@ public partial class MainWindow : Window
         ToggleHistoryPanel();
 
     private void DownloadsButton_Click(object sender, RoutedEventArgs e) =>
-        ShowDownloadsWindow();
+        ToggleDownloadsPanel();
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e) =>
         ToggleSettingsPanel();
@@ -1032,10 +1244,14 @@ public partial class MainWindow : Window
         {
         }
 
-        BookmarksBarBorder.Visibility = Visibility.Visible;
-        StatusText.Text = _bookmarkService.Bookmarks.Count == 0
-            ? "Bookmarks bar is open. Add a bookmark with Ctrl+D."
-            : "Bookmarks bar is open.";
+        var willShow = BookmarksBarBorder.Visibility != Visibility.Visible;
+        BookmarksBarBorder.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
+        BookmarksBarRow.Height = willShow ? new GridLength(28) : new GridLength(0);
+        StatusText.Text = willShow
+            ? _bookmarkService.Bookmarks.Count == 0
+                ? "Bookmarks bar is open. Add a bookmark with Ctrl+D."
+                : "Bookmarks bar is open."
+            : "Bookmarks bar hidden.";
     }
 
     private void PerformanceButton_Click(object sender, RoutedEventArgs e) =>
@@ -1046,18 +1262,6 @@ public partial class MainWindow : Window
 
     private static void OpenPrivateWindow() =>
         new MainWindow(isPrivate: true).Show();
-
-    private void ShowDownloadsWindow()
-    {
-        if (_downloadsWindow is null)
-        {
-            _downloadsWindow = new DownloadsWindow(_downloadService, _isPrivate) { Owner = this };
-            _downloadsWindow.Closed += (_, _) => _downloadsWindow = null;
-        }
-
-        _downloadsWindow.Show();
-        _downloadsWindow.Activate();
-    }
 
     private void CloseHistoryButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1088,6 +1292,74 @@ public partial class MainWindow : Window
         if (PerformancePanel.Visibility == Visibility.Visible)
         {
             TogglePerformancePanel();
+        }
+    }
+
+    private void CloseDownloadsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DownloadsPanel.Visibility == Visibility.Visible)
+        {
+            ToggleDownloadsPanel();
+        }
+    }
+
+    private void ClearCompletedDownloadsButton_Click(object sender, RoutedEventArgs e)
+    {
+        _downloadService.ClearCompleted();
+        StatusText.Text = "Completed download records cleared.";
+    }
+
+    private static DownloadItem? GetDownloadItem(object sender) =>
+        (sender as FrameworkElement)?.Tag as DownloadItem;
+
+    private void OpenDownloadedFileButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = GetDownloadItem(sender);
+        if (item is null || !File.Exists(item.SavePath))
+        {
+            StatusText.Text = "The downloaded file could not be found.";
+            return;
+        }
+
+        TryOpenDownloadLocation(item.SavePath, "file");
+    }
+
+    private void OpenDownloadFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = GetDownloadItem(sender);
+        var folder = item is null ? null : Path.GetDirectoryName(item.SavePath);
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        {
+            StatusText.Text = "The download folder could not be found.";
+            return;
+        }
+
+        TryOpenDownloadLocation(folder, "folder");
+    }
+
+    private void CancelDownloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = GetDownloadItem(sender);
+        if (item is not null)
+        {
+            _downloadService.Cancel(item);
+            StatusText.Text = $"Canceling {item.FileName}...";
+        }
+    }
+
+    private void TryOpenDownloadLocation(string path, string kind)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            MessageBox.Show(
+                $"Quartz could not open this {kind}.\n\n{exception.Message}",
+                "Quartz downloads",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 
@@ -1380,7 +1652,7 @@ public partial class MainWindow : Window
         }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.J)
         {
-            ShowDownloadsWindow();
+            ToggleDownloadsPanel();
             e.Handled = true;
         }
         else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.N)
@@ -1407,6 +1679,12 @@ public partial class MainWindow : Window
 
     private bool CloseOpenPanel()
     {
+        if (DownloadsPanel.Visibility == Visibility.Visible)
+        {
+            ToggleDownloadsPanel();
+            return true;
+        }
+
         if (PerformancePanel.Visibility == Visibility.Visible)
         {
             TogglePerformancePanel();
@@ -1438,7 +1716,6 @@ public partial class MainWindow : Window
     {
         ThemeManager.AppearanceChanged -= ThemeManager_AppearanceChanged;
         _downloadService.PersistenceFailed -= DownloadService_PersistenceFailed;
-        _downloadsWindow?.Close();
 
         foreach (var tab in _tabs)
         {

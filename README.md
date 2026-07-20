@@ -2,7 +2,7 @@
 
 Quartz is a small Windows web browser prototype. It uses C#, .NET 8, WPF, and Microsoft Edge WebView2 (Chromium).
 
-## Version 0.10 features
+## Version 0.10.1 features and fixes
 
 - One browser window with multiple tabs
 - New tab button
@@ -11,8 +11,8 @@ Quartz is a small Windows web browser prototype. It uses C#, .NET 8, WPF, and Mi
 - `Ctrl+W` to close the active tab
 - Address bar with URL handling and selectable DuckDuckGo, Google, or Bing search
 - Back, forward, reload, and home controls
-- Configurable homepage used by Home and new tabs
-- Configurable startup behavior: homepage or blank page
+- Configurable homepage used by Home and homepage startup
+- Configurable startup behavior: homepage or the Quartz new-tab page
 - Page URL and title synchronization
 - Navigation-aware back and forward buttons
 - Loading and status indicators
@@ -29,12 +29,13 @@ Quartz is a small Windows web browser prototype. It uses C#, .NET 8, WPF, and Mi
 - Clear-all history action with confirmation
 - Successful HTTP/HTTPS visits only, capped at the latest 500 entries
 - Consecutive duplicate URL suppression
+- Packaged Quartz executable/window/taskbar icon
+- Native WebView2 favicons in compact tab headers, with an origin `/favicon.ico` fallback
 - WebView2 download detection with live progress and status
 - Default saving to the user's Downloads folder with collision-safe names
 - Completed-only JSON download history that survives restarts
 - Clear completed download history without affecting active, canceled, or failed items
-- Removed the experimental Agent UI; Quartz contains only browser features
-- Downloads run through WebView2 and save directly to the user's Downloads folder; the Downloads toolbar button and `Ctrl+J` open a separate manager window
+- Downloads run through WebView2 and save directly to the user's Downloads folder; the toolbar button and `Ctrl+J` toggle an integrated Quartz panel
 - JSON-backed Settings panel with toolbar and `Ctrl+,` access
 - Confirmed controls to clear history, downloads history, bookmarks, or all three
 - Private browsing windows with isolated temporary WebView2 profiles
@@ -50,16 +51,17 @@ Quartz is a small Windows web browser prototype. It uses C#, .NET 8, WPF, and Mi
 - Compact icon toolbar with consistent sizing, hover/pressed states, disabled states, and tooltips
 - Polished address bar, bookmarks bar, security state, loading indicator, and status area
 - Consistent Quartz cards, headers, spacing, and actions across History, Settings, site information, permissions, and Downloads
-- Responsive browser chrome and scrolling side panels for windows from 800x600 upward
+- Compact 80-pixel tab/toolbar chrome by default, a hidden collapsible bookmarks row, and scrolling side panels for windows from 800x600 upward
 - A subtle private-mode badge and private color treatment that remains distinct without obscuring browsing
 - `Escape` closes the open History, Settings, or site-information panel
 - Four built-in Quartz theme presets: Light, Dark, Midnight, and Neon
 - Five accent presets that update progress, active-tab, selection, and primary-action colors
 - Immediate theme/accent preview with JSON persistence across restarts
-- Optional compact Quartz sidebar with routes to bookmarks, History, Downloads, Settings, and Resource Controls
+- Optional compact Quartz sidebar with routes to bookmarks, History, Downloads, Settings, and Performance info
 - A local Quartz new-tab page with branded styling, address/search input, and bookmark-backed quick links
 - New-tab styling follows the selected theme and accent without loading an external website
-- Resource Controls preview with clearly disabled Memory saver, CPU limiter, and Network limiter placeholders
+- Honest Performance info panel explaining WebView2/Windows resource management without simulated limiter controls
+- Dynamic semantic brushes for field text, warnings, secure states, errors, tooltips, selections, and accent contrast across every theme
 - No assistant, chat, or automated browsing feature is included
 
 ## Prerequisites
@@ -94,22 +96,25 @@ In Visual Studio, open `Quartz.sln`, set `Quartz` as the startup project, and pr
 - Press `Ctrl+H` to open or close the History panel.
 - Press `Ctrl+,` to open or close Settings.
 - Press `Ctrl+Shift+N` or click **Private** to open a private window.
-- Press `Ctrl+J` to open the separate Downloads window.
+- Press `Ctrl+J` to open or close the integrated Downloads panel.
 - Press `Alt+Left` and `Alt+Right` to move through page history.
 - Click a bookmark title to open it in the active tab, or its remove button to delete it.
 - Click a History entry to open it in the active tab, or use **Clear all** to remove every stored visit.
-- Use the separate Downloads window to monitor progress, cancel active transfers, open completed files, open their folder, or clear completed records.
+- Use the integrated Downloads panel to monitor progress, cancel active transfers, open completed files, open their folder, or clear completed records.
 - Use Settings to change the homepage, search engine, startup page, or clear stored browsing data.
 - Use Settings > **Appearance** to switch theme and accent presets or show/hide the sidebar.
 - Click the sidebar toggle at the start of the toolbar to collapse or restore the sidebar.
 - Enter a URL or search in the Quartz new-tab page, or use one of its bookmark/static quick links.
-- Open **Resource controls** from the bottom sidebar button to view the explicitly nonfunctional performance preview.
+- Use the sidebar star to show or hide the bookmarks bar.
+- Open **Performance info** from the bottom sidebar button for an honest explanation of resource-management limitations.
 
 Bookmarks are stored locally at `%LOCALAPPDATA%\Quartz\bookmarks.json`. If that file is missing or contains invalid JSON, Quartz starts with an empty bookmarks bar.
 
 Browsing history is stored at `%LOCALAPPDATA%\Quartz\history.json`. Missing or invalid history files are treated as empty, and Quartz retains at most the newest 500 valid entries.
 
 Downloads are saved to `%USERPROFILE%\Downloads` by default. Completed-download history is stored at `%LOCALAPPDATA%\Quartz\downloads.json` and retains the newest 200 completed items. Canceled, interrupted, and failed transfers are tracked internally but are not saved as completed history.
+
+Quartz first requests each tab icon through WebView2's favicon API. If the runtime does not return a usable image, Quartz requests `/favicon.ico` from the current site's origin. Pages without either source retain the packaged Quartz icon.
 
 Browser preferences are stored at `%LOCALAPPDATA%\Quartz\settings.json`. This includes homepage, search engine, startup behavior, theme, accent, and sidebar visibility. Missing, invalid, or corrupted settings files safely fall back to the DuckDuckGo homepage/search engine, Light theme, Quartz violet accent, visible sidebar, and homepage startup behavior.
 
@@ -121,6 +126,17 @@ The security indicator reports the active URL's connection scheme after WebView2
 
 ## Verification checklist
 
+Use this Version 0.10.1 regression test:
+
+1. Launch Quartz and confirm its diamond icon appears in the title bar and taskbar.
+2. Visit Google and GitHub in separate tabs. Confirm each tab shows its site favicon, the active tab is distinct, and long titles trim cleanly.
+3. Confirm the bookmarks bar is hidden initially, toggle it with the sidebar star, and verify the webpage starts immediately below the compact tab/toolbar chrome when hidden.
+4. Select Light, Dark, Midnight, and Neon in Settings. Check toolbar, tabs, address field, ComboBox lists, History, Downloads, Settings, site information, Performance info, and permission prompts for readable text.
+5. Open Downloads from the toolbar and with `Ctrl+J`; confirm both toggle the integrated panel without opening another window.
+6. Download a file and verify live progress/status, source URL, save path, cancel, open-file, open-folder, failed/canceled status, persistence, and Clear completed.
+7. Open **Performance info** and confirm it contains no functional-looking CPU, memory, or network limiter controls.
+8. Recheck bookmarks, History, Settings, private mode, permission prompts, and security status.
+
 Use this Step 10 identity-feature smoke test:
 
 1. Open Settings > **Appearance** and select Light, Dark, Midnight, and Neon. Confirm each updates the window, toolbar, tabs, address bar, panels, progress color, and new-tab page immediately.
@@ -128,7 +144,7 @@ Use this Step 10 identity-feature smoke test:
 3. Restart Quartz and confirm the selected theme, accent, and sidebar visibility persist.
 4. Collapse and restore the sidebar with the toolbar menu button. Use its Bookmarks, History, Downloads, and Settings buttons and confirm they route to the existing Quartz views without closing the browser.
 5. Open a new tab. Confirm the local Quartz identity page appears, bookmark/static quick links work, and entering both a domain and a search phrase navigates the active tab.
-6. Open **Resource controls** from the sidebar. Confirm Memory saver, CPU limiter, and Network limiter are disabled and the panel explicitly says resource limiting is not implemented.
+6. Open **Performance info** from the sidebar. Confirm it explains that Windows and WebView2 manage resources and presents no simulated limiter controls.
 7. Open a private window and confirm themes, the sidebar, and the new-tab page work while private history/download isolation remains unchanged.
 8. Recheck normal tabs, navigation, bookmarks, History, Downloads, Settings, site information, permissions, and all existing keyboard shortcuts.
 
@@ -158,7 +174,7 @@ Use this Step 7 private-mode smoke test:
 1. Click **New Private Window** and press `Ctrl+Shift+N`; confirm each opens a window whose title and toolbar identify Private Mode.
 2. Visit a page in a normal window and another page in a private window. Confirm only the normal visit appears in normal History.
 3. Open Downloads from a private window and confirm it is labeled **Private Downloads**.
-4. Complete a private download. Confirm the file remains in the Downloads folder but its record does not appear in the normal Downloads window after the private window closes.
+4. Complete a private download. Confirm the file remains in the Downloads folder but its record does not appear in the normal Downloads panel after the private window closes.
 5. Create a bookmark privately and confirm it appears normally; Quartz intentionally shares bookmarks with private windows.
 6. Close the private window and confirm its temporary `Quartz-Private-*` WebView2 profile is removed without changing normal history, bookmarks, downloads, or settings.
 7. Confirm normal browsing, tabs, navigation, search, and downloads still work.
@@ -169,7 +185,7 @@ Use this Step 6 settings smoke test:
 2. Enter a homepage domain such as `github.com`, save, and confirm Quartz normalizes it to `https://github.com/`.
 3. Click **Home** and open a new tab; confirm both use the saved homepage.
 4. Select Google, save, enter a search phrase in the address bar, and confirm the search uses Google. Repeat with Bing or DuckDuckGo.
-5. Choose **Open blank page**, save, restart Quartz, and confirm the first tab opens `about:blank`.
+5. Choose **Open Quartz new tab**, save, restart Quartz, and confirm the local Quartz new-tab page opens.
 6. Restart again and confirm the homepage, search engine, and startup choice persist.
 7. Create test history, a bookmark, and a completed download record. Use each individual clear button and confirm the visible UI updates after confirmation.
 8. Recreate test data, use **Clear all browsing data**, and confirm history, completed-download history, and bookmarks are cleared together.
@@ -200,6 +216,7 @@ Also confirm that Back and Forward enable only when available, the loading indic
 Quartz.sln
 src/Quartz/
   App.xaml                  Shared Quartz palette and reusable control styles
+  Assets/Quartz.ico        Packaged window, taskbar, executable, and fallback tab icon
   BrowserTab.cs             Per-tab WebView2 instance and browser state
   BrowserSettings.cs        Homepage and search settings
   MainWindow.xaml           Browser window layout
@@ -218,10 +235,8 @@ src/Quartz/
     SettingsService.cs      Safe JSON loading and saving for browser preferences
     ThemeManager.cs         Built-in palettes, accents, and live WPF resource updates
     NewTabPageBuilder.cs    Theme-aware local new-tab HTML and quick-link generation
-  DownloadsWindow.xaml      Separate downloads manager window
-  DownloadsWindow.xaml.cs   Download actions and private-window download display
   PermissionPromptWindow.xaml     Quartz site-permission dialog
   PermissionPromptWindow.xaml.cs  Allow/block permission decision handling
 ```
 
-Version 0.10 intentionally does not include a custom color picker, real memory/CPU/network limiting, a full certificate interstitial, unsafe certificate bypass, per-site permission management, session restore, pause/resume, download retries, history search or grouping, bookmark folders or editing, bookmark import/export, accounts, sync, extensions, or advanced security controls.
+Version 0.10.1 intentionally does not include a custom color picker, real memory/CPU/network limiting, a full certificate interstitial, unsafe certificate bypass, per-site permission management, session restore, pause/resume, download retries, history search or grouping, bookmark folders or editing, bookmark import/export, accounts, sync, extensions, or advanced security controls. The Performance info panel is informational and never claims to enforce resource limits.

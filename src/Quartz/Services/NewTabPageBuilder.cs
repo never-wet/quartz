@@ -54,7 +54,7 @@ internal static class NewTabPageBuilder
                 h1{font-size:34px;letter-spacing:.16em;margin:0;font-weight:650}.theme{color:{{{palette.MutedText}}};font-size:12px;letter-spacing:.12em;text-transform:uppercase;text-align:center;margin-top:8px}
                 form{display:flex;gap:10px;background:{{{palette.Surface}}};border:1px solid {{{palette.Border}}};padding:8px;border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,.12)}
                 input{flex:1;min-width:0;background:transparent;color:{{{palette.Text}}};border:0;outline:0;padding:10px 13px;font-size:16px}
-                button{border:0;border-radius:10px;background:{{{ThemeManager.CurrentAccentHex}}};color:white;padding:0 22px;font-size:14px;font-weight:650;cursor:pointer}
+                button{border:0;border-radius:10px;background:{{{ThemeManager.CurrentAccentHex}}};color:{{{ThemeManager.CurrentOnAccentHex}}};padding:0 22px;font-size:14px;font-weight:650;cursor:pointer}
                 h2{font-size:12px;color:{{{palette.MutedText}}};text-transform:uppercase;letter-spacing:.13em;margin:28px 4px 10px}
                 .links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
                 .quick{display:flex;flex-direction:column;gap:4px;text-decoration:none;color:{{{palette.Text}}};background:{{{palette.Surface}}};border:1px solid {{{palette.Border}}};padding:14px;border-radius:12px;transition:transform .14s,border-color .14s}

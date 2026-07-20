@@ -5,26 +5,38 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Quartz"
+        Icon="Assets/Quartz.ico"
         Width="1100"
         Height="680"
         MinWidth="640"
         MinHeight="480"
+        WindowStyle="None"
+        ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource QuartzCanvasBrush}"
         TextElement.Foreground="{DynamicResource QuartzTextBrush}"
         Loaded="Window_Loaded"
+        StateChanged="Window_StateChanged"
         SizeChanged="Window_SizeChanged"
         Closed="Window_Closed"
+        PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown"
         PreviewKeyDown="Window_PreviewKeyDown">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="36"
+                      ResizeBorderThickness="6"
+                      GlassFrameThickness="0"
+                      CornerRadius="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
     <Window.Resources>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="42" />
-            <RowDefinition Height="50" />
-            <RowDefinition Height="34" />
+            <RowDefinition Height="36" />
+            <RowDefinition Height="44" />
+            <RowDefinition x:Name="BookmarksBarRow" Height="0" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="26" />
+            <RowDefinition Height="22" />
         </Grid.RowDefinitions>
 
         <Border x:Name="TabStripBorder"
@@ -34,12 +46,35 @@
                 BorderBrush="{DynamicResource QuartzBorderBrush}"
                 BorderThickness="0,0,0,1">
             <DockPanel LastChildFill="True">
+                <Button x:Name="CloseWindowButton"
+                        DockPanel.Dock="Right"
+                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Content="&#x00D7;"
+                        FontSize="18"
+                        ToolTip="Close"
+                        Click="CloseWindowButton_Click" />
+                <Button x:Name="MaximizeRestoreWindowButton"
+                        DockPanel.Dock="Right"
+                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Content="&#x25A1;"
+                        ToolTip="Maximize"
+                        Click="MaximizeRestoreWindowButton_Click" />
+                <Button x:Name="MinimizeWindowButton"
+                        DockPanel.Dock="Right"
+                        Style="{StaticResource WindowCaptionButtonStyle}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Content="&#x2014;"
+                        ToolTip="Minimize"
+                        Click="MinimizeWindowButton_Click" />
                 <Button x:Name="NewTabButton"
                         DockPanel.Dock="Right"
                         Style="{StaticResource ToolbarButtonStyle}"
-                        Width="34"
-                        Height="34"
-                        Margin="5,4,2,3"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Width="30"
+                        Height="30"
+                        Margin="4,3,2,2"
                         Content="+"
                         FontSize="20"
                         ToolTip="New tab (Ctrl+T)"
@@ -47,22 +82,24 @@
 
                 <Border x:Name="PrivateModeBadge"
                         DockPanel.Dock="Right"
-                        Margin="5,7,3,6"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Margin="5,6,3,5"
                         Padding="9,2"
                         Background="{DynamicResource QuartzPrivateBrush}"
                         CornerRadius="9"
                         Visibility="Collapsed">
-                    <TextBlock Foreground="White" FontSize="10" FontWeight="Bold" Text="PRIVATE" />
+                    <TextBlock Foreground="{DynamicResource QuartzPrivateTextBrush}" FontSize="10" FontWeight="Bold" Text="PRIVATE" />
                 </Border>
 
                 <TabControl x:Name="Tabs"
+                            WindowChrome.IsHitTestVisibleInChrome="True"
                             SelectionChanged="Tabs_SelectionChanged" />
             </DockPanel>
         </Border>
 
         <Border x:Name="ToolbarBorder"
                 Grid.Row="1"
-                Padding="8,7"
+                Padding="7,5"
                 Background="{DynamicResource QuartzSurfaceBrush}"
                 BorderBrush="{DynamicResource QuartzBorderBrush}"
                 BorderThickness="0,0,0,1">
@@ -200,7 +237,8 @@
                 Padding="8,3"
                 Background="{DynamicResource QuartzRaisedBrush}"
                 BorderBrush="{DynamicResource QuartzBorderBrush}"
-                BorderThickness="0,0,0,1">
+                BorderThickness="0,0,0,1"
+                Visibility="Collapsed">
             <DockPanel>
                 <TextBlock x:Name="BookmarksLabel"
                            DockPanel.Dock="Left"
@@ -273,7 +311,7 @@
                     <Button x:Name="SidebarBookmarksButton"
                             Style="{StaticResource ToolbarButtonStyle}"
                             Width="40" Margin="0,0,0,7"
-                            Content="&#x2605;" ToolTip="Show bookmarks bar"
+                            Content="&#x2605;" ToolTip="Show or hide bookmarks bar"
                             Click="SidebarBookmarksButton_Click" />
                     <Button x:Name="SidebarHistoryButton"
                             Style="{StaticResource ToolbarButtonStyle}"
@@ -293,7 +331,7 @@
                     <Button x:Name="SidebarPerformanceButton"
                             Style="{StaticResource ToolbarButtonStyle}"
                             Width="40" Margin="0"
-                            Content="&#x25A5;" ToolTip="Resource controls preview"
+                            Content="&#x25A5;" ToolTip="Performance information"
                             Click="PerformanceButton_Click" />
                 </StackPanel>
             </Border>
@@ -380,6 +418,134 @@
                                                    Text="{Binding VisitedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
                                     </StackPanel>
                                 </Button>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border x:Name="DownloadsPanel"
+                    Grid.Row="0"
+                    Grid.Column="2"
+                    Width="420"
+                    Style="{StaticResource PanelBorderStyle}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="48" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="DownloadsHeading"
+                                       VerticalAlignment="Center"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Text="Downloads" />
+                            <Button Grid.Column="1"
+                                    Height="28"
+                                    Margin="0,0,7,0"
+                                    Padding="9,0"
+                                    Content="Clear completed"
+                                    ToolTip="Remove completed records without deleting files"
+                                    Click="ClearCompletedDownloadsButton_Click" />
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource PanelCloseButtonStyle}"
+                                    Content="&#x00D7;"
+                                    ToolTip="Close downloads"
+                                    Click="CloseDownloadsButton_Click" />
+                        </Grid>
+                    </Border>
+                    <TextBlock x:Name="PrivateDownloadNotice"
+                               Grid.Row="1"
+                               Margin="12,9,12,0"
+                               Padding="10,7"
+                               Background="{DynamicResource QuartzAccentSoftBrush}"
+                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                               FontSize="11"
+                               Text="Private download records disappear when this window closes; downloaded files remain on disk."
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed" />
+                    <ListBox x:Name="DownloadsItems"
+                             Grid.Row="2"
+                             Margin="10"
+                             Padding="0"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                <Setter Property="Margin" Value="0,0,0,8" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource PanelCardStyle}" Padding="12">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{Binding FileName}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding FileName}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="10,0,0,0"
+                                                       Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                       FontSize="11"
+                                                       Text="{Binding Status}" />
+                                        </Grid>
+                                        <TextBlock Margin="0,4,0,0"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   FontSize="11"
+                                                   Text="{Binding ProgressText}" />
+                                        <ProgressBar Height="5"
+                                                     Margin="0,8,0,0"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Value="{Binding ProgressPercent, Mode=OneWay}"
+                                                     IsIndeterminate="{Binding IsIndeterminate, Mode=OneWay}">
+                                            <ProgressBar.Style>
+                                                <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ProgressBar.Style>
+                                        </ProgressBar>
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   FontSize="10"
+                                                   Text="{Binding SourceUrl}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding SourceUrl}" />
+                                        <TextBlock Margin="0,2,0,0"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   FontSize="10"
+                                                   Text="{Binding SavePath}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding SavePath}" />
+                                        <WrapPanel Margin="0,9,0,0">
+                                            <Button Content="Open file" Tag="{Binding}" Margin="0,0,6,0" Click="OpenDownloadedFileButton_Click">
+                                                <Button.Style><Style TargetType="Button" BasedOn="{StaticResource QuartzButtonStyle}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsCompleted}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Button.Style>
+                                            </Button>
+                                            <Button Content="Open folder" Tag="{Binding}" Margin="0,0,6,0" Click="OpenDownloadFolderButton_Click">
+                                                <Button.Style><Style TargetType="Button" BasedOn="{StaticResource QuartzButtonStyle}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsCompleted}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Button.Style>
+                                            </Button>
+                                            <Button Content="Cancel" Tag="{Binding}" Click="CancelDownloadButton_Click">
+                                                <Button.Style><Style TargetType="Button" BasedOn="{StaticResource QuartzButtonStyle}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Button.Style>
+                                            </Button>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -611,7 +777,7 @@
                                             Padding="10,0"
                                             Style="{StaticResource QuartzButtonStyle}"
                                             HorizontalContentAlignment="Left"
-                                            Foreground="#FF9C3430"
+                                            Foreground="{DynamicResource QuartzDangerBrush}"
                                             Content="Clear all browsing data"
                                             Click="ClearAllBrowsingDataButton_Click" />
                                 </StackPanel>
@@ -662,35 +828,35 @@
                             <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                                 <Border Width="4" Height="22" Margin="0,0,9,0" Background="{DynamicResource QuartzAccentBrush}" CornerRadius="2" />
-                                <TextBlock VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" Text="Resource controls" />
+                                <TextBlock VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" Text="Performance info" />
                             </StackPanel>
-                            <Button Grid.Column="1" Style="{StaticResource PanelCloseButtonStyle}" Content="&#x00D7;" ToolTip="Close resource controls" Click="ClosePerformanceButton_Click" />
+                            <Button Grid.Column="1" Style="{StaticResource PanelCloseButtonStyle}" Content="&#x00D7;" ToolTip="Close performance information" Click="ClosePerformanceButton_Click" />
                         </Grid>
                     </Border>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="16">
                             <Border Margin="0,0,0,12" Padding="12" Background="{DynamicResource QuartzAccentSoftBrush}" BorderBrush="{DynamicResource QuartzAccentBrush}" BorderThickness="1" CornerRadius="8">
                                 <StackPanel>
-                                    <TextBlock FontWeight="SemiBold" Text="Performance preview" />
-                                    <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="These controls are design placeholders only. Quartz does not currently limit browser resources." />
+                                    <TextBlock FontWeight="SemiBold" Text="Managed by Windows and WebView2" />
+                                    <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Quartz does not currently impose custom CPU, memory, or network limits." />
                                 </StackPanel>
                             </Border>
                             <Border Margin="0,0,0,10" Style="{StaticResource PanelCardStyle}">
                                 <StackPanel>
-                                    <CheckBox Content="Memory saver" IsEnabled="False" />
-                                    <TextBlock Margin="20,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Tab memory management is not implemented yet." />
+                                    <TextBlock FontWeight="SemiBold" Text="Browser processes" />
+                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="WebView2 may use multiple renderer, network, and utility processes. Windows Task Manager provides the authoritative live usage view." />
                                 </StackPanel>
                             </Border>
                             <Border Margin="0,0,0,10" Style="{StaticResource PanelCardStyle}">
                                 <StackPanel>
-                                    <CheckBox Content="CPU limiter" IsEnabled="False" />
-                                    <TextBlock Margin="20,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Quartz does not alter WebView2 CPU scheduling." />
+                                    <TextBlock FontWeight="SemiBold" Text="Current limitation" />
+                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="WebView2 does not expose safe per-tab resource caps through Quartz's current integration." />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource PanelCardStyle}">
                                 <StackPanel>
-                                    <CheckBox Content="Network limiter" IsEnabled="False" />
-                                    <TextBlock Margin="20,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Network throttling is not implemented." />
+                                    <TextBlock FontWeight="SemiBold" Text="No controls are simulated" />
+                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="This panel is informational only and does not change system behavior." />
                                 </StackPanel>
                             </Border>
                         </StackPanel>

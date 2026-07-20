@@ -20,6 +20,14 @@
         <SolidColorBrush x:Key="QuartzHoverBrush" po:Freeze="False" Color="#FFEDEAF3" />
         <SolidColorBrush x:Key="QuartzPressedBrush" po:Freeze="False" Color="#FFE1DCEB" />
         <SolidColorBrush x:Key="QuartzPrivateBrush" po:Freeze="False" Color="#FF4D3A68" />
+        <SolidColorBrush x:Key="QuartzPrivateTextBrush" po:Freeze="False" Color="#FFFFFFFF" />
+        <SolidColorBrush x:Key="QuartzOnAccentBrush" po:Freeze="False" Color="#FFFFFFFF" />
+        <SolidColorBrush x:Key="QuartzDangerBrush" po:Freeze="False" Color="#FFB23A48" />
+        <SolidColorBrush x:Key="QuartzWarningBrush" po:Freeze="False" Color="#FF946814" />
+        <SolidColorBrush x:Key="QuartzSecureBrush" po:Freeze="False" Color="#FF287A55" />
+        <SolidColorBrush x:Key="QuartzTooltipBrush" po:Freeze="False" Color="#FF29262F" />
+        <SolidColorBrush x:Key="QuartzTooltipTextBrush" po:Freeze="False" Color="#FFFFFFFF" />
+        <SolidColorBrush x:Key="QuartzFieldTextBrush" po:Freeze="False" Color="#FF25232B" />
 
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="Segoe UI" />
@@ -50,7 +58,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource QuartzHoverBrush}" />
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FFC8C0D6" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource QuartzBorderBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource QuartzPressedBrush}" />
@@ -77,7 +85,7 @@
         </Style>
 
         <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource QuartzButtonStyle}">
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Foreground" Value="{DynamicResource QuartzOnAccentBrush}" />
             <Setter Property="Background" Value="{DynamicResource QuartzAccentBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource QuartzAccentBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -121,17 +129,27 @@
             <Setter Property="FontSize" Value="15" />
         </Style>
 
+        <Style x:Key="WindowCaptionButtonStyle" TargetType="Button" BasedOn="{StaticResource QuietButtonStyle}">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="35" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontFamily" Value="Segoe UI Symbol" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="ToolTipService.ShowDuration" Value="3000" />
+        </Style>
+
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
 
         <Style TargetType="TabItem">
-            <Setter Property="MinWidth" Value="150" />
-            <Setter Property="MaxWidth" Value="250" />
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Margin" Value="2,3,0,0" />
-            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="MinWidth" Value="140" />
+            <Setter Property="MaxWidth" Value="225" />
+            <Setter Property="Height" Value="33" />
+            <Setter Property="Margin" Value="2,2,0,0" />
+            <Setter Property="Padding" Value="9,0" />
             <Setter Property="Foreground" Value="{DynamicResource QuartzMutedTextBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -157,7 +175,7 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="#FFE9E6EF" />
+                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource QuartzHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter Property="Panel.ZIndex" Value="2" />
@@ -174,7 +192,7 @@
         </Style>
 
         <Style x:Key="AddressBarStyle" TargetType="TextBox">
-            <Setter Property="Height" Value="36" />
+            <Setter Property="Height" Value="34" />
             <Setter Property="Padding" Value="13,0" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="FontSize" Value="14" />
@@ -244,8 +262,8 @@
         </Style>
 
         <Style TargetType="ToolTip">
-            <Setter Property="Background" Value="#FF29262F" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{DynamicResource QuartzTooltipBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource QuartzTooltipTextBrush}" />
             <Setter Property="Padding" Value="8,5" />
             <Setter Property="FontSize" Value="11" />
         </Style>
@@ -265,7 +283,7 @@
         <Style TargetType="ComboBox">
             <Setter Property="Height" Value="34" />
             <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource QuartzFieldTextBrush}" />
             <Setter Property="Background" Value="{DynamicResource QuartzAddressBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource QuartzBorderBrush}" />
         </Style>
@@ -274,6 +292,27 @@
             <Setter Property="Padding" Value="8,5" />
             <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
             <Setter Property="Background" Value="{DynamicResource QuartzSurfaceBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource QuartzAccentSoftBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource QuartzAccentSoftBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsHighlighted" Value="True">
                     <Setter Property="Background" Value="{DynamicResource QuartzAccentSoftBrush}" />
@@ -288,6 +327,27 @@
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style TargetType="ListBox">
+            <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource QuartzBorderBrush}" />
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource QuartzHoverBrush}" />
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource QuartzAccentSoftBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource QuartzTextBrush}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
     </Application.Resources>
 </Application>

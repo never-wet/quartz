@@ -11,6 +11,8 @@ internal sealed class BrowserTab(WebView2 browser) : IDisposable
 
     public TextBlock TitleBlock { get; set; } = null!;
 
+    public Image FaviconImage { get; set; } = null!;
+
     public string Title { get; set; } = "New tab";
 
     public string Status { get; set; } = "Starting browser engine...";

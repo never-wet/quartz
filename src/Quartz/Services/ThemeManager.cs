@@ -58,6 +58,8 @@ internal static class ThemeManager
 
     public static string CurrentAccentHex => Accents[CurrentAccent];
 
+    public static string CurrentOnAccentHex => GetOnAccent(CurrentAccentHex);
+
     public static AccentPreset GetRecommendedAccent(BrowserTheme theme) => theme switch
     {
         BrowserTheme.Dark => AccentPreset.Teal,
@@ -92,9 +94,17 @@ internal static class ThemeManager
             SetBrush(resources, "QuartzSidebarBrush", palette.Sidebar);
             SetBrush(resources, "QuartzProgressTrackBrush", palette.ProgressTrack);
             SetBrush(resources, "QuartzPrivateBrush", palette.Private);
+            SetBrush(resources, "QuartzPrivateTextBrush", "#FFFFFF");
             SetBrush(resources, "QuartzAccentBrush", accentHex);
             SetBrush(resources, "QuartzAccentHoverBrush", AdjustBrightness(accentHex, -0.14));
             SetBrush(resources, "QuartzAccentSoftBrush", Mix(accentHex, palette.Surface, 0.18));
+            SetBrush(resources, "QuartzOnAccentBrush", GetOnAccent(accentHex));
+            SetBrush(resources, "QuartzDangerBrush", theme == BrowserTheme.Light ? "#B23A48" : "#FF8A84");
+            SetBrush(resources, "QuartzWarningBrush", theme == BrowserTheme.Light ? "#946814" : "#F2C15B");
+            SetBrush(resources, "QuartzSecureBrush", theme == BrowserTheme.Light ? "#287A55" : "#65D69E");
+            SetBrush(resources, "QuartzTooltipBrush", theme == BrowserTheme.Light ? "#29262F" : palette.Raised);
+            SetBrush(resources, "QuartzTooltipTextBrush", theme == BrowserTheme.Light ? "#FFFFFF" : palette.Text);
+            SetBrush(resources, "QuartzFieldTextBrush", "#25232B");
         }
 
         AppearanceChanged?.Invoke(null, EventArgs.Empty);
@@ -118,6 +128,13 @@ internal static class ThemeManager
         var back = ParseColor(background);
         byte Blend(byte a, byte b) => (byte)Math.Round((a * foregroundWeight) + (b * (1 - foregroundWeight)));
         return $"#{Blend(front.R, back.R):X2}{Blend(front.G, back.G):X2}{Blend(front.B, back.B):X2}";
+    }
+
+    private static string GetOnAccent(string accent)
+    {
+        var color = ParseColor(accent);
+        var luminance = ((0.2126 * color.R) + (0.7152 * color.G) + (0.0722 * color.B)) / 255;
+        return luminance > 0.62 ? "#172018" : "#FFFFFF";
     }
 
     private static Color ParseColor(string value) =>
