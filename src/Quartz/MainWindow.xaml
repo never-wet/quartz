@@ -1,0 +1,715 @@
+<Window x:Class="Quartz.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Quartz"
+        Width="1100"
+        Height="680"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource QuartzCanvasBrush}"
+        TextElement.Foreground="{DynamicResource QuartzTextBrush}"
+        Loaded="Window_Loaded"
+        SizeChanged="Window_SizeChanged"
+        Closed="Window_Closed"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="42" />
+            <RowDefinition Height="50" />
+            <RowDefinition Height="34" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="26" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="TabStripBorder"
+                Grid.Row="0"
+                Padding="5,0"
+                Background="{DynamicResource QuartzTabStripBrush}"
+                BorderBrush="{DynamicResource QuartzBorderBrush}"
+                BorderThickness="0,0,0,1">
+            <DockPanel LastChildFill="True">
+                <Button x:Name="NewTabButton"
+                        DockPanel.Dock="Right"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Width="34"
+                        Height="34"
+                        Margin="5,4,2,3"
+                        Content="+"
+                        FontSize="20"
+                        ToolTip="New tab (Ctrl+T)"
+                        Click="NewTabButton_Click" />
+
+                <Border x:Name="PrivateModeBadge"
+                        DockPanel.Dock="Right"
+                        Margin="5,7,3,6"
+                        Padding="9,2"
+                        Background="{DynamicResource QuartzPrivateBrush}"
+                        CornerRadius="9"
+                        Visibility="Collapsed">
+                    <TextBlock Foreground="White" FontSize="10" FontWeight="Bold" Text="PRIVATE" />
+                </Border>
+
+                <TabControl x:Name="Tabs"
+                            SelectionChanged="Tabs_SelectionChanged" />
+            </DockPanel>
+        </Border>
+
+        <Border x:Name="ToolbarBorder"
+                Grid.Row="1"
+                Padding="8,7"
+                Background="{DynamicResource QuartzSurfaceBrush}"
+                BorderBrush="{DynamicResource QuartzBorderBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button x:Name="SidebarToggleButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Content="&#x2630;"
+                            ToolTip="Show or hide the Quartz sidebar"
+                            Click="SidebarToggleButton_Click" />
+                    <Button x:Name="BackButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Content="&#x2190;"
+                            ToolTip="Back (Alt+Left)"
+                            IsEnabled="False"
+                            Click="BackButton_Click" />
+                </StackPanel>
+                <Button x:Name="ForwardButton"
+                        Grid.Column="1"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Content="&#x2192;"
+                        ToolTip="Forward (Alt+Right)"
+                        IsEnabled="False"
+                        Click="ForwardButton_Click" />
+                <Button x:Name="ReloadButton"
+                        Grid.Column="2"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Content="&#x21BB;"
+                        ToolTip="Reload (Ctrl+R)"
+                        Click="ReloadButton_Click" />
+                <Button x:Name="HomeButton"
+                        Grid.Column="3"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Content="&#x2302;"
+                        ToolTip="Home"
+                        Click="HomeButton_Click" />
+
+                <Button x:Name="SecurityButton"
+                        Grid.Column="4"
+                        Style="{StaticResource QuartzButtonStyle}"
+                        MinWidth="78"
+                        Margin="0,0,6,0"
+                        Padding="9,0"
+                        Background="{DynamicResource QuartzRaisedBrush}"
+                        BorderBrush="{DynamicResource QuartzBorderBrush}"
+                        Content="Neutral"
+                        ToolTip="Site information"
+                        Click="SecurityButton_Click" />
+
+                <TextBox x:Name="AddressBar"
+                         Grid.Column="5"
+                         Style="{StaticResource AddressBarStyle}"
+                         ToolTip="Enter an address or search (Ctrl+L)"
+                         KeyDown="AddressBar_KeyDown"
+                         GotKeyboardFocus="AddressBar_GotKeyboardFocus" />
+
+                <Button x:Name="BookmarkButton"
+                        Grid.Column="6"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Width="38"
+                        MinWidth="38"
+                        Padding="0"
+                        FontFamily="Segoe UI Symbol"
+                        FontSize="19"
+                        Content="&#x2606;"
+                        ToolTip="Bookmark this page (Ctrl+D)"
+                        IsEnabled="False"
+                        Click="BookmarkButton_Click" />
+
+                <Button x:Name="HistoryButton"
+                        Grid.Column="7"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Content="&#x25F4;"
+                        ToolTip="Show history (Ctrl+H)"
+                        Click="HistoryButton_Click" />
+
+                <Button x:Name="DownloadsButton"
+                        Grid.Column="8"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Content="&#x2193;"
+                        ToolTip="Open downloads (Ctrl+J)"
+                        Click="DownloadsButton_Click" />
+
+                <Button x:Name="SettingsButton"
+                        Grid.Column="9"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Content="&#x2699;"
+                        ToolTip="Show settings (Ctrl+,)"
+                        Click="SettingsButton_Click" />
+
+                <Button x:Name="PrivateWindowButton"
+                        Grid.Column="10"
+                        Style="{StaticResource ToolbarButtonStyle}"
+                        Content="&#x25C7;"
+                        ToolTip="New private window (Ctrl+Shift+N)"
+                        Click="NewPrivateWindowButton_Click" />
+
+                <StackPanel x:Name="LoadingStatusPanel"
+                            Grid.Column="11"
+                            Margin="5,0,2,0"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                    <ProgressBar x:Name="LoadingProgress"
+                                 Width="36"
+                                 Height="4"
+                                 IsIndeterminate="True"
+                                 Visibility="Collapsed" />
+                    <TextBlock x:Name="LoadingText"
+                               Margin="6,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                               Text="Loading..."
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border x:Name="BookmarksBarBorder"
+                Grid.Row="2"
+                Padding="8,3"
+                Background="{DynamicResource QuartzRaisedBrush}"
+                BorderBrush="{DynamicResource QuartzBorderBrush}"
+                BorderThickness="0,0,0,1">
+            <DockPanel>
+                <TextBlock x:Name="BookmarksLabel"
+                           DockPanel.Dock="Left"
+                           Margin="2,0,10,0"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource QuartzMutedTextBrush}"
+                           Text="Bookmarks" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="BookmarksItems">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,5,0"
+                                        Background="Transparent"
+                                        CornerRadius="6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button MaxWidth="180"
+                                                Height="24"
+                                                Padding="8,0"
+                                                Style="{StaticResource QuietButtonStyle}"
+                                                HorizontalContentAlignment="Left"
+                                                Content="{Binding Title}"
+                                                Tag="{Binding}"
+                                                ToolTip="{Binding Url}"
+                                                Click="BookmarkItem_Click" />
+                                        <Button Width="24"
+                                                Height="24"
+                                                Padding="0"
+                                                Style="{StaticResource QuietButtonStyle}"
+                                                Content="&#x00D7;"
+                                                Tag="{Binding}"
+                                                ToolTip="Remove bookmark"
+                                                Click="RemoveBookmarkButton_Click" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="SidebarColumn" Width="0" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="SidePanelColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="SidebarBorder"
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Width="56"
+                    Padding="7,10"
+                    Background="{DynamicResource QuartzSidebarBrush}"
+                    BorderBrush="{DynamicResource QuartzBorderBrush}"
+                    BorderThickness="0,0,1,0"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <Button x:Name="SidebarBookmarksButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Width="40" Margin="0,0,0,7"
+                            Content="&#x2605;" ToolTip="Show bookmarks bar"
+                            Click="SidebarBookmarksButton_Click" />
+                    <Button x:Name="SidebarHistoryButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Width="40" Margin="0,0,0,7"
+                            Content="&#x25F4;" ToolTip="History"
+                            Click="HistoryButton_Click" />
+                    <Button x:Name="SidebarDownloadsButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Width="40" Margin="0,0,0,7"
+                            Content="&#x2193;" ToolTip="Downloads"
+                            Click="DownloadsButton_Click" />
+                    <Button x:Name="SidebarSettingsButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Width="40" Margin="0,0,0,7"
+                            Content="&#x2699;" ToolTip="Settings"
+                            Click="SettingsButton_Click" />
+                    <Button x:Name="SidebarPerformanceButton"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Width="40" Margin="0"
+                            Content="&#x25A5;" ToolTip="Resource controls preview"
+                            Click="PerformanceButton_Click" />
+                </StackPanel>
+            </Border>
+
+            <Grid x:Name="BrowserHost" Grid.Row="0" Grid.Column="1" />
+
+            <Border x:Name="HistoryPanel"
+                    Grid.Row="0"
+                    Grid.Column="2"
+                    Width="360"
+                    Style="{StaticResource PanelBorderStyle}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="48" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Style="{StaticResource PanelHeaderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Text="History" />
+                            <Button x:Name="ClearHistoryButton"
+                                    Grid.Column="1"
+                                    Height="28"
+                                    Margin="0,0,8,0"
+                                    Padding="10,0"
+                                    Style="{StaticResource QuartzButtonStyle}"
+                                    Content="Clear all"
+                                    ToolTip="Clear all browsing history"
+                                    Click="ClearHistoryButton_Click" />
+                            <Button x:Name="CloseHistoryButton"
+                                    Grid.Column="2"
+                                    Width="28"
+                                    Height="28"
+                                    Style="{StaticResource PanelCloseButtonStyle}"
+                                    Content="&#x00D7;"
+                                    ToolTip="Close history"
+                                    Click="CloseHistoryButton_Click" />
+                        </Grid>
+                    </Border>
+
+                    <ListBox x:Name="HistoryItems"
+                             Grid.Row="1"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Button Padding="12,9"
+                                        Style="{StaticResource QuietButtonStyle}"
+                                        HorizontalContentAlignment="Stretch"
+                                        Tag="{Binding}"
+                                        ToolTip="{Binding Url}"
+                                        Click="HistoryItem_Click">
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Text="{Binding Title}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Margin="0,3,0,0"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   Text="{Binding Url}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Margin="0,3,0,0"
+                                                   FontSize="10"
+                                                   Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                                   Text="{Binding VisitedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border x:Name="SiteInfoPanel"
+                    Grid.Row="0"
+                    Grid.Column="2"
+                    Width="360"
+                    Style="{StaticResource PanelBorderStyle}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="50" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" Text="Site information" />
+                            <Button Grid.Column="1" Style="{StaticResource PanelCloseButtonStyle}" Content="&#x00D7;" ToolTip="Close site information" Click="CloseSiteInfoButton_Click" />
+                        </Grid>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="16">
+                            <Border Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock x:Name="SiteConnectionText" FontSize="15" FontWeight="SemiBold" Text="Local or internal page" />
+                                    <TextBlock x:Name="SiteDomainText" Margin="0,8,0,0" FontWeight="SemiBold" Text="No site" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock x:Name="SiteUrlText" Margin="0,4,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="SitePrivacyNoteText" Margin="0,12,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" TextWrapping="Wrap" Text="No website data is associated with this page." />
+                                </StackPanel>
+                            </Border>
+                            <Button x:Name="ClearCurrentSiteDataButton"
+                                    Height="34"
+                                    Margin="0,12,0,0"
+                                    Style="{StaticResource QuartzButtonStyle}"
+                                    Content="Clear this site's data"
+                                    ToolTip="Clear cookies and accessible storage for this site"
+                                    Click="ClearCurrentSiteDataButton_Click" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border x:Name="SettingsPanel"
+                    Grid.Row="0"
+                    Grid.Column="2"
+                    Width="420"
+                    Style="{StaticResource PanelBorderStyle}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="50" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Style="{StaticResource PanelHeaderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                <Border Width="4"
+                                        Height="22"
+                                        Margin="0,0,9,0"
+                                        Background="{DynamicResource QuartzAccentBrush}"
+                                        CornerRadius="2" />
+                                <TextBlock VerticalAlignment="Center"
+                                           FontSize="17"
+                                           FontWeight="SemiBold"
+                                           Text="Settings" />
+                            </StackPanel>
+                            <Button x:Name="CloseSettingsButton"
+                                    Grid.Column="1"
+                                    Width="30"
+                                    Height="30"
+                                    Style="{StaticResource PanelCloseButtonStyle}"
+                                    Content="&#x00D7;"
+                                    ToolTip="Close settings"
+                                    Click="CloseSettingsButton_Click" />
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1"
+                                  Padding="14"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <Border Margin="0,0,0,12"
+                                    Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="Appearance" />
+                                    <TextBlock Margin="0,4,0,10"
+                                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                               FontSize="11"
+                                               Text="Theme and accent changes apply immediately."
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,0,0,5" FontSize="11" Text="Theme preset" />
+                                    <ComboBox x:Name="ThemeComboBox"
+                                              Margin="0,0,0,9"
+                                              SelectionChanged="ThemeComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Light" Tag="Light" />
+                                        <ComboBoxItem Content="Dark" Tag="Dark" />
+                                        <ComboBoxItem Content="Midnight" Tag="Midnight" />
+                                        <ComboBoxItem Content="Neon" Tag="Neon" />
+                                    </ComboBox>
+                                    <TextBlock Margin="0,0,0,5" FontSize="11" Text="Accent color" />
+                                    <ComboBox x:Name="AccentComboBox"
+                                              Margin="0,0,0,10"
+                                              SelectionChanged="AccentComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Quartz violet" Tag="Violet" />
+                                        <ComboBoxItem Content="Sky blue" Tag="Blue" />
+                                        <ComboBoxItem Content="Teal" Tag="Teal" />
+                                        <ComboBoxItem Content="Rose" Tag="Rose" />
+                                        <ComboBoxItem Content="Neon lime" Tag="Lime" />
+                                    </ComboBox>
+                                    <CheckBox x:Name="SidebarVisibleCheckBox"
+                                              Content="Show Quartz sidebar"
+                                              Checked="SidebarVisibleCheckBox_Changed"
+                                              Unchecked="SidebarVisibleCheckBox_Changed" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,0,0,12"
+                                    Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Text="Homepage" />
+                                    <TextBlock Margin="0,4,0,9"
+                                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                               FontSize="11"
+                                               Text="Used by the Home button and homepage startup option."
+                                               TextWrapping="Wrap" />
+                                    <TextBox x:Name="HomepageTextBox"
+                                             Height="32"
+                                             Padding="8,4"
+                                             VerticalContentAlignment="Center"
+                                             ToolTip="Enter an HTTP/HTTPS URL or domain" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,0,0,12"
+                                    Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Text="Address bar search" />
+                                    <TextBlock Margin="0,4,0,9"
+                                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                               FontSize="11"
+                                               Text="Choose the search engine used for non-URL text."
+                                               TextWrapping="Wrap" />
+                                    <ComboBox x:Name="SearchEngineComboBox"
+                                              Height="32"
+                                              Padding="7,3">
+                                        <ComboBoxItem Content="DuckDuckGo" Tag="DuckDuckGo" />
+                                        <ComboBoxItem Content="Google" Tag="Google" />
+                                        <ComboBoxItem Content="Bing" Tag="Bing" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,0,0,12"
+                                    Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Text="On startup" />
+                                    <TextBlock Margin="0,4,0,9"
+                                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                               FontSize="11"
+                                               Text="Choose the first page Quartz opens."
+                                               TextWrapping="Wrap" />
+                                    <ComboBox x:Name="StartupBehaviorComboBox"
+                                              Height="32"
+                                              Padding="7,3">
+                                        <ComboBoxItem Content="Open homepage" Tag="Homepage" />
+                                        <ComboBoxItem Content="Open Quartz new tab" Tag="BlankPage" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Button x:Name="SaveSettingsButton"
+                                    Height="34"
+                                    Margin="0,0,0,18"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    Content="Save settings"
+                                    Click="SaveSettingsButton_Click" />
+
+                            <Border Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Text="Clear browsing data" />
+                                    <TextBlock Margin="0,4,0,10"
+                                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                               FontSize="11"
+                                               Text="These actions ask for confirmation and update Quartz immediately."
+                                               TextWrapping="Wrap" />
+                                    <Button Height="32"
+                                            Margin="0,0,0,7"
+                                            Padding="10,0"
+                                            Style="{StaticResource QuartzButtonStyle}"
+                                            HorizontalContentAlignment="Left"
+                                            Content="Clear history"
+                                            Click="ClearHistoryFromSettingsButton_Click" />
+                                    <Button Height="32"
+                                            Margin="0,0,0,7"
+                                            Padding="10,0"
+                                            Style="{StaticResource QuartzButtonStyle}"
+                                            HorizontalContentAlignment="Left"
+                                            Content="Clear downloads history"
+                                            Click="ClearDownloadsFromSettingsButton_Click" />
+                                    <Button Height="32"
+                                            Margin="0,0,0,7"
+                                            Padding="10,0"
+                                            Style="{StaticResource QuartzButtonStyle}"
+                                            HorizontalContentAlignment="Left"
+                                            Content="Clear bookmarks"
+                                            Click="ClearBookmarksFromSettingsButton_Click" />
+                                    <Button Height="32"
+                                            Padding="10,0"
+                                            Style="{StaticResource QuartzButtonStyle}"
+                                            HorizontalContentAlignment="Left"
+                                            Foreground="#FF9C3430"
+                                            Content="Clear all browsing data"
+                                            Click="ClearAllBrowsingDataButton_Click" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,12,0,0"
+                                    Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="Privacy and security" />
+                                    <TextBlock Margin="0,4,0,10"
+                                               Foreground="{DynamicResource QuartzMutedTextBrush}"
+                                               FontSize="11"
+                                               Text="Quick controls for the active browser profile."
+                                               TextWrapping="Wrap" />
+                                    <Button Height="32"
+                                            Margin="0,0,0,7"
+                                            Padding="10,0"
+                                            Style="{StaticResource QuartzButtonStyle}"
+                                            HorizontalContentAlignment="Left"
+                                            Content="Clear cookies and site data"
+                                            Click="ClearCookiesAndSiteDataButton_Click" />
+                                    <Button Height="32"
+                                            Padding="10,0"
+                                            Style="{StaticResource QuartzButtonStyle}"
+                                            HorizontalContentAlignment="Left"
+                                            Content="Open a private window"
+                                            Click="NewPrivateWindowButton_Click" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border x:Name="PerformancePanel"
+                    Grid.Row="0"
+                    Grid.Column="2"
+                    Width="360"
+                    Style="{StaticResource PanelBorderStyle}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="50" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Style="{StaticResource PanelHeaderStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                <Border Width="4" Height="22" Margin="0,0,9,0" Background="{DynamicResource QuartzAccentBrush}" CornerRadius="2" />
+                                <TextBlock VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" Text="Resource controls" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Style="{StaticResource PanelCloseButtonStyle}" Content="&#x00D7;" ToolTip="Close resource controls" Click="ClosePerformanceButton_Click" />
+                        </Grid>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="16">
+                            <Border Margin="0,0,0,12" Padding="12" Background="{DynamicResource QuartzAccentSoftBrush}" BorderBrush="{DynamicResource QuartzAccentBrush}" BorderThickness="1" CornerRadius="8">
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="Performance preview" />
+                                    <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="These controls are design placeholders only. Quartz does not currently limit browser resources." />
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="0,0,0,10" Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <CheckBox Content="Memory saver" IsEnabled="False" />
+                                    <TextBlock Margin="20,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Tab memory management is not implemented yet." />
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="0,0,0,10" Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <CheckBox Content="CPU limiter" IsEnabled="False" />
+                                    <TextBlock Margin="20,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Quartz does not alter WebView2 CPU scheduling." />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource PanelCardStyle}">
+                                <StackPanel>
+                                    <CheckBox Content="Network limiter" IsEnabled="False" />
+                                    <TextBlock Margin="20,5,0,0" Foreground="{DynamicResource QuartzMutedTextBrush}" FontSize="11" TextWrapping="Wrap" Text="Network throttling is not implemented." />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="4"
+                Padding="10,3"
+                Background="{DynamicResource QuartzRaisedBrush}"
+                BorderBrush="{DynamicResource QuartzBorderBrush}"
+                BorderThickness="0,1,0,0">
+            <TextBlock x:Name="StatusText"
+                       VerticalAlignment="Center"
+                       FontSize="11"
+                       Foreground="{DynamicResource QuartzMutedTextBrush}"
+                       Text="Starting Quartz..."
+                       TextTrimming="CharacterEllipsis" />
+        </Border>
+    </Grid>
+</Window>
